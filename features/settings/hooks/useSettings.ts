@@ -22,7 +22,7 @@ export function useSettings() {
     const { doctorId } = useTenant();
     const sessionUser = useSessionStore((state) => state.user);
 
-    const [activeSection, setActiveSection] = useState<SettingSection>('Procedure');
+    const [activeSection, setActiveSection] = useState<SettingSection>('Complaints');
 
     const [items, setItems] = useState<MasterDataItem[]>([]);
     const [itemsCache, setItemsCache] = useState<Record<string, MasterDataItem[]>>({});

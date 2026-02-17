@@ -12,27 +12,49 @@ interface MobileHeaderProps {
 
 const MobileHeader = ({ user, appointmentsCount, onSettingsPress }: MobileHeaderProps) => (
     <View className="bg-white border-b border-gray-200 pt-12 pb-4 px-4">
-        <View className="flex-row items-center justify-between">
-            <View className="w-24" />
-            <Text className="text-3xl font-bold text-gray-800 -mt-10 tracking-widest">AVANCE</Text>
-            <View className="flex-row items-center gap-5">
+        <View className="flex-row items-center justify-end">
+
+            {/* Centered Title */}
+            <Text
+                style={{
+                    position: 'absolute',
+                    left: 0,
+                    right: 0,
+                    textAlign: 'center',
+                    top: -30, // adjust this value
+                    fontSize: 22,
+                    fontWeight: '500',
+                    color: '#374151',
+                }}
+            >
+                AVANCE
+            </Text>
+
+            {/* Right Buttons */}
+            <View className="flex-row items-center -mt-4">
                 <TouchableOpacity
-                    className="flex-row items-center px-3 py-1"
+                    className="flex-row items-center px-3 py-1 mr-4"
                     style={{ borderRadius: 5, borderWidth: 1, borderColor: '#8E8E93' }}
                     onPress={onSettingsPress}
                 >
                     <Icon icon={DASHBOARD_ICONS.settings} size={18} color="#8E8E93" />
-                    <Text style={{ color: '#8E8E93', fontSize: 15, marginLeft: 4 }}>Settings</Text>
+                    <Text style={{ color: '#8E8E93', fontSize: 18, marginLeft: 4 }}>
+                        Settings
+                    </Text>
                 </TouchableOpacity>
+
                 <TouchableOpacity
                     className="flex-row items-center px-3 py-1"
                     style={{ borderRadius: 5, borderWidth: 1, borderColor: '#8E8E93' }}
                 >
                     <Icon icon={DASHBOARD_ICONS.helpOutline} size={18} color="#8E8E93" />
-                    <Text style={{ color: '#8E8E93', fontSize: 15, marginLeft: 4 }}>Help</Text>
+                    <Text style={{ color: '#8E8E93', fontSize: 18, marginLeft: 4 }}>
+                        Help
+                    </Text>
                 </TouchableOpacity>
             </View>
         </View>
+
 
         <View className="flex-row items-center mt-8">
             <View

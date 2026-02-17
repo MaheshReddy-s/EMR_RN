@@ -4,6 +4,9 @@ import { ConsultationRepository } from '@/repositories';
 
 export interface ConsultationDetailRow {
     text: string;
+    name?: string;
+    dosage?: string;
+    duration?: string;
     drawings: StrokeData[];
     height?: number;
 }
@@ -219,8 +222,12 @@ function extractPrescriptionRows(items: unknown[]): ConsultationDetailRow[] {
             }
 
             if (rowText || drawings.length > 0) {
+                // Return structured data so the UI can replicate the layering exactly
                 rows.push({
                     text: rowText,
+                    name: medicineName || '',
+                    dosage: toNonEmptyText(variantRecord.dosage) || '',
+                    duration: toNonEmptyText(variantRecord.duration) || '',
                     drawings,
                     height: rowHeight,
                 });

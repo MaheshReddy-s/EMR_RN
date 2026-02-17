@@ -36,8 +36,7 @@ const AppointmentRow = React.memo(({ item, onPress }: AppointmentRowProps) => {
                     {item.patientName}
                 </Text>
                 <View className="flex-row items-center">
-                    <Text className="text-base text-gray-500 mr-2">{item.patientMobile}</Text>
-                    {item.type && <Text className="text-base text-gray-400">• {item.type}</Text>}
+                    {item.type && <Text className="text-base text-gray-400">{item.type}</Text>}
                 </View>
             </View>
             <View className={`flex-row items-center px-2 py-2 rounded-lg ${statusColorClass}`}>

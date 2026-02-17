@@ -154,7 +154,7 @@ export function mapPdfHistory(pdfHistory: Array<Record<string, unknown>>): Array
         link: (h.pdf_link as string) || '',
         name: (h.pdf_name as string) || 'Report',
         date: safeFormatTimestamp(extractBestDate(h)),
-        consultationID: (h._id as string) || (h.consultation_id as string) || (h.id as string) || '',
+        consultationID: (h.consultation_id as string) || (h._id as string) || (h.id as string) || '',
     }));
 }
 

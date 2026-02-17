@@ -131,39 +131,91 @@ export default function VisitConsultationDetailsModal({
                                         {section.title}
                                     </Text>
 
-                                    {section.rows.map((row, index) => (
-                                        <View
-                                            key={`${section.key}-${index}`}
-                                            className="py-3 border-b border-gray-100"
-                                        >
-                                            {row.text ? (
-                                                <Text className="text-gray-900 text-[17px] leading-6 mb-1">
-                                                    {row.text}
-                                                </Text>
-                                            ) : null}
+                                    {section.rows.map((row, index) => {
+                                        const isPrescription = section.key === 'prescriptions';
+                                        const hasDrawings = row.drawings && row.drawings.length > 0;
 
-                                            {row.drawings && row.drawings.length > 0 ? (
-                                                <View
-                                                    style={{
-                                                        height: row.height || 100,
-                                                        width: '100%',
-                                                        backgroundColor: '#f9f9f9',
-                                                        borderRadius: 8,
-                                                        marginTop: 4,
-                                                        overflow: 'hidden'
-                                                    }}
-                                                >
-                                                    <DrawingCanvas
-                                                        initialDrawings={row.drawings}
-                                                        canvasOnly={true}
-                                                        penColor="#5d271aff"
-                                                        penThickness={1.5}
-                                                        isErasing={false}
-                                                    />
+                                        // Calculate height from drawings if available to prevent cutting
+                                        let calculatedMinHeight = (row.height || 32);
+
+                                        if (hasDrawings) {
+                                            // Simple heuristic: find max Y in logical coords and convert to screen
+                                            // This ensures even if metadata height is lost, we show the full drawing
+                                            let maxY = 0;
+                                            row.drawings.forEach(s => {
+                                                const matches = s.svg.match(/([ML])(-?\d+\.?\d*)\s+(-?\d+\.?\d*)/g);
+                                                if (matches) {
+                                                    matches.forEach(m => {
+                                                        const parts = m.trim().split(/\s+/);
+                                                        const y = parseFloat(parts[parts.length - 1]);
+                                                        if (y > maxY) maxY = y;
+                                                    });
+                                                }
+                                            });
+
+                                            // Convert logical Y (0-820) back to screen Y (relative to 720 container)
+                                            const screenMaxY = (maxY * 720 / 820) + 5.6; // Reduced bottom padding cushion
+                                            calculatedMinHeight = Math.max(calculatedMinHeight, screenMaxY);
+                                        }
+
+                                        return (
+                                            <View
+                                                key={`${section.key}-${index}`}
+                                                className="border-b border-gray-100 relative"
+                                                style={{ minHeight: calculatedMinHeight }}
+                                            >
+                                                {/* Text Layer */}
+                                                <View className="px-2 pt-[5.6px] pb-[5.6px] z-20">
+                                                    <View className="flex-row items-start">
+                                                        {isPrescription && row.name ? (
+                                                            <>
+                                                                <View className="flex-1">
+                                                                    <Text className="text-gray-900 font-bold text-[13.5px]" numberOfLines={2}>
+                                                                        {row.name}
+                                                                    </Text>
+                                                                </View>
+                                                                <View className="flex-row items-start justify-end ml-2" style={{ width: '45%' }}>
+                                                                    <Text className="text-gray-700 font-bold text-[13.5px] text-right flex-1" numberOfLines={1}>
+                                                                        {row.dosage}
+                                                                    </Text>
+                                                                    <Text className="text-gray-900 font-bold text-[13.2px] text-right ml-2" style={{ minWidth: 60 }} numberOfLines={1}>
+                                                                        {row.duration}
+                                                                    </Text>
+                                                                </View>
+                                                            </>
+                                                        ) : (
+                                                            <View className="flex-1">
+                                                                <Text
+                                                                    className="text-gray-900 font-bold"
+                                                                    style={{ fontSize: 13.5 }}
+                                                                    numberOfLines={2}
+                                                                >
+                                                                    {row.text}
+                                                                </Text>
+                                                            </View>
+                                                        )}
+                                                    </View>
                                                 </View>
-                                            ) : null}
-                                        </View>
-                                    ))}
+
+                                                {/* Drawing Layer - Absolute overlay to match consultation screen */}
+                                                {hasDrawings && (
+                                                    <View
+                                                        className="absolute top-0 left-0 right-0 bottom-0 z-10"
+                                                        pointerEvents="none"
+                                                    >
+                                                        <DrawingCanvas
+                                                            initialDrawings={row.drawings}
+                                                            canvasOnly={true}
+                                                            penColor="#5d271aff"
+                                                            penThickness={1.5}
+                                                            isErasing={false}
+                                                            style={{ height: '100%' }}
+                                                        />
+                                                    </View>
+                                                )}
+                                            </View>
+                                        );
+                                    })}
                                 </View>
                             ))}
 

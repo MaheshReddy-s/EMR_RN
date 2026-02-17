@@ -50,113 +50,99 @@ export default function PrescriptionRowLayout({
 
     return (
         <View
-            className="bg-white border-b border-[#e9ecef] relative"
+            className="bg-white border-b border-[#e9ecef] flex-row"
             style={[style, { minHeight: effectiveHeight }]}
         >
-            <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={true}
-                contentContainerStyle={{ flexGrow: 1 }}
-                bounces={false}
-            >
+            <View className="flex-1 relative">
+                {/* Text Layer - Relative on web for visibility, Absolute on app for drawing */}
                 <View
-                    className="relative"
-                    style={{ minHeight: effectiveHeight, width: 858 }}
+                    className={Platform.OS === 'web' ? "px-2 pt-[5.6px] pb-[5.6px] z-20" : "absolute top-0 left-0 right-0 px-2 pt-[5.6px] pb-[5.6px] z-20"}
+                    pointerEvents={Platform.OS === 'web' ? "auto" : "none"}
                 >
-                    {/* Text Layer - Relative on web for visibility, Absolute on app for drawing */}
-                    <View
-                        className={Platform.OS === 'web' ? "p-2 z-20" : "absolute top-0 left-0 right-0 bottom-0 z-20"}
-                        pointerEvents={Platform.OS === 'web' ? "auto" : "none"}
-                    >
+                    <View className="flex-row items-start">
                         {showIndex && (
-                            <Text
-                                className={Platform.OS === 'web' ? "text-[13.5px] font-semibold text-gray-500 mr-2" : "absolute h-6 text-[13.5px] font-semibold text-gray-500 text-left"}
-                                style={Platform.OS !== 'web' && { left: 10, top: 1, width: 25, textAlignVertical: 'center' }}
-                            >
+                            <Text className="text-[13.5px] font-semibold text-gray-500 mr-1 mt-[1px]">
                                 {index + 1}.
                             </Text>
                         )}
-                        <Text
-                            className="text-gray-900"
-                            style={[
-                                Platform.OS === 'web' ? { fontSize: 13.5, fontWeight: 'bold' } : { position: 'absolute', left: showIndex ? 28 : 10, top: 1, width: isFullWidth ? 520 : (showIndex ? 270 : 288), fontSize: 13.5, fontWeight: 'bold' },
-                                isFullWidth && Platform.OS !== 'web' && { fontWeight: 'normal', fontSize: 13 }
-                            ]}
-                        >
-                            {prescription?.name}
-                        </Text>
-                        {!isFullWidth && (
-                            <View className={Platform.OS === 'web' ? "flex-row mt-1" : ""}>
+                        <View className="flex-1">
+                            <Text
+                                className="text-gray-900 font-bold"
+                                style={[{ fontSize: 13.5 }, isFullWidth && { fontWeight: 'normal', fontSize: 13 }]}
+                                numberOfLines={2}
+                            >
+                                {prescription?.name}
+                            </Text>
+                        </View>
+
+                        {Platform.OS !== 'web' && !isFullWidth && (
+                            <View className="flex-row items-start justify-end ml-2" style={{ width: '45%' }}>
                                 <Text
-                                    className="text-gray-700 font-bold"
-                                    style={Platform.OS === 'web' ? { fontSize: 13, marginRight: 10 } : { position: 'absolute', left: 316, top: 1, width: 230, fontSize: 13.5 }}
+                                    className="text-gray-700 font-bold text-right flex-1"
+                                    style={{ fontSize: 13.5 }}
+                                    numberOfLines={1}
                                 >
                                     {prescription?.dosage}
                                 </Text>
                                 <Text
-                                    className="text-gray-900 font-bold"
+                                    className="text-gray-900 font-bold text-right ml-2"
+                                    style={{ fontSize: 13.2, minWidth: 60 }}
                                     numberOfLines={1}
-                                    style={Platform.OS === 'web' ? { fontSize: 13 } : { position: 'absolute', left: 554, top: 1, width: 160, textAlign: 'right', fontSize: 13.2 }}
                                 >
                                     {prescription?.duration}
                                 </Text>
                             </View>
                         )}
-                        {prescription?.notes && Platform.OS === 'web' && (
-                            <Text className="text-[13px] text-gray-600 mt-1">
-                                {prescription?.notes}
-                            </Text>
-                        )}
                     </View>
 
-                    {/* Canvas Overlay - Hidden on web */}
-                    {Platform.OS !== 'web' && (
-                        <View
-                            className="absolute top-0 left-0 bottom-0 z-10"
-                            style={{ width: FIXED_CONTENT_WIDTH }}
-                        >
-                            {renderCanvas()}
+                    {Platform.OS === 'web' && !isFullWidth && (
+                        <View className="flex-row mt-1">
+                            <Text className="text-gray-700 font-bold text-[13px] mr-2">{prescription?.dosage}</Text>
+                            <Text className="text-gray-900 font-bold text-[13px]">{prescription?.duration}</Text>
                         </View>
                     )}
                 </View>
 
-                {/* Floating Tools */}
-                <View
-                    className="absolute z-[99] flex-row items-center p-0"
-                    style={{ top: 2, left: 720, width: 100, height: 22.5 }}
+                {/* Canvas Overlay - Hidden on web */}
+                {Platform.OS !== 'web' && (
+                    <View className="absolute top-0 left-0 right-0 bottom-0 z-10">
+                        {renderCanvas()}
+                    </View>
+                )}
+            </View>
+
+            {/* Action Tools - Fixed on right side */}
+            <View
+                className="flex-row items-start justify-end px-1"
+                style={{ width: 105, height: 35 }}
+            >
+                <TouchableOpacity
+                    className="justify-center items-center w-[25px] h-full"
+                    onPress={onExpand}
                 >
+                    <Icon icon={PRESCRIPTION_ROW_ICONS.expand} size={18} color="#007AFF" />
+                </TouchableOpacity>
+                <TouchableOpacity
+                    className="justify-center items-center w-[25px] h-full"
+                    onPress={onEdit}
+                >
+                    <Icon icon={PRESCRIPTION_ROW_ICONS.edit} size={18} color="#007AFF" />
+                </TouchableOpacity>
+                {Platform.OS !== 'web' && (
                     <TouchableOpacity
-                        className="justify-center items-center"
-                        style={{ width: 25, height: 28 }}
-                        onPress={onExpand}
+                        className="justify-center items-center w-[25px] h-full"
+                        onPress={onClear}
                     >
-                        <Icon icon={PRESCRIPTION_ROW_ICONS.expand} size={18} color="#007AFF" />
+                        <Icon icon={PRESCRIPTION_ROW_ICONS.clear} size={18} color="#007AFF" />
                     </TouchableOpacity>
-                    <TouchableOpacity
-                        className="justify-center items-center"
-                        style={{ width: 25, height: 28 }}
-                        onPress={onEdit}
-                    >
-                        <Icon icon={PRESCRIPTION_ROW_ICONS.edit} size={18} color="#007AFF" />
-                    </TouchableOpacity>
-                    {Platform.OS !== 'web' && (
-                        <TouchableOpacity
-                            className="justify-center items-center"
-                            style={{ width: 25, height: 28 }}
-                            onPress={onClear}
-                        >
-                            <Icon icon={PRESCRIPTION_ROW_ICONS.clear} size={18} color="#007AFF" />
-                        </TouchableOpacity>
-                    )}
-                    <TouchableOpacity
-                        className="justify-center items-center"
-                        style={{ width: 25, height: 28 }}
-                        onPress={onDelete}
-                    >
-                        <Icon icon={PRESCRIPTION_ROW_ICONS.delete} size={18} color="#FF3B30" />
-                    </TouchableOpacity>
-                </View>
-            </ScrollView>
+                )}
+                <TouchableOpacity
+                    className="justify-center items-center w-[25px] h-full"
+                    onPress={onDelete}
+                >
+                    <Icon icon={PRESCRIPTION_ROW_ICONS.delete} size={18} color="#FF3B30" />
+                </TouchableOpacity>
+            </View>
         </View>
     );
 }

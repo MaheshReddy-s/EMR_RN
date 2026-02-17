@@ -1,4 +1,5 @@
 import { StrokeData } from '@/components/consultation/drawing-canvas';
+import { API_REFERENCE_WIDTH, FIXED_CONTENT_WIDTH } from '@/components/consultation/prescription-row-layout';
 import { User } from '@/services/auth-service';
 import { Patient } from '@/services/patient-service';
 import { Platform } from 'react-native';
@@ -120,21 +121,25 @@ export const PdfService = {
     },
 };
 
-function renderStrokesToSvg(strokes: StrokeData[] | undefined, height: number = 60): string {
+// Use API_REFERENCE_WIDTH (820) for the viewBox to match DrawingCanvas logical space
+function renderStrokesToSvg(strokes: StrokeData[] | undefined, height: number = 70): string {
     if (!strokes || strokes.length === 0) return '';
 
-    // Fixed width of 720 matches the POC specification and container width
+    // Calculate logical height based on aspect ratio (820 / 720)
+    // This ensures physical 1px = logical constant units
+    const logicalHeight = height * (API_REFERENCE_WIDTH / FIXED_CONTENT_WIDTH);
+
     const paths = strokes.map(stroke => {
         const d = stroke.svg;
         const color = stroke.color || '#000000';
         const width = stroke.width || 1.5;
-        const blend = stroke.blendMode === 'Clear' ? 'destination-out' : 'source-over';
+        const blend = stroke.blendMode === 'clear' ? 'destination-out' : 'source-over';
 
         return `<path d="${d}" fill="none" stroke="${color}" stroke-width="${width}" stroke-linecap="round" stroke-linejoin="round" style="mix-blend-mode: ${blend}" />`;
     }).join('');
 
     return `
-        <svg viewBox="0 0 720 ${height}" width="100%" height="${height}" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">
+        <svg viewBox="0 0 ${API_REFERENCE_WIDTH} ${logicalHeight}" width="100%" height="${height}" xmlns="http://www.w3.org/2000/svg" style="display: block;">
             ${paths}
         </svg>
     `;
@@ -151,22 +156,28 @@ function buildHtml(data: PdfData): string {
             const displayTitle = section.title === 'Instructions' ? 'Instruction' : section.title;
 
             const rowsHtml = section.items.map((item, idx) => {
-                const rowHeight = item.height || 47;
+                // Match DrawingCanvas default heights
+                const rowHeight = item.height || 32;
                 const dosage = item.dosage || '';
                 const duration = item.duration || '';
 
                 return `
-                <div class="prescription-row" style="height: ${rowHeight}px;">
-                    <div class="text-layer">
-                        <div class="text-base number">${idx + 1}.</div>
-                        <div class="text-base name ${!isPrescriptions ? 'name-full' : ''}">${escapeHtml(item.name)}</div>
-                        ${isPrescriptions ? `
-                            <div class="text-base dosage">${escapeHtml(dosage)}</div>
-                            <div class="text-base duration">${escapeHtml(duration)}</div>
-                        ` : ''}
-                    </div>
+                <div class="prescription-row" style="min-height: ${rowHeight}px;">
                     <div class="canvas-overlay">
                         ${renderStrokesToSvg(item.drawings, rowHeight)}
+                    </div>
+                    <div class="text-layer">
+                        <div class="row-flex">
+                            <div class="name-container">
+                                <span class="name ${!isPrescriptions ? 'name-full' : ''}">${escapeHtml(item.name)}</span>
+                            </div>
+                            ${isPrescriptions ? `
+                                <div class="dosage-duration">
+                                    <span class="dosage">${escapeHtml(dosage)}</span>
+                                    <span class="duration">${escapeHtml(duration)}</span>
+                                </div>
+                            ` : ''}
+                        </div>
                     </div>
                 </div>
                 `;
@@ -245,38 +256,51 @@ function buildHtml(data: PdfData): string {
             
             .prescription-row { 
                 position: relative;
-                width: 720px;
+                width: ${FIXED_CONTENT_WIDTH}px;
                 border-bottom: 1px solid #f2f2f2; 
                 page-break-inside: avoid;
-                overflow: hidden;
+                display: block;
+                min-height: 32px;
+            }
+
+            .row-flex {
+                display: flex;
+                flex-direction: row;
+                align-items: flex-start;
+                padding: 1px 10px;
+                width: 100%;
+                z-index: 20;
             }
 
             .text-layer {
-                position: absolute;
-                top: 0; left: 0; right: 0; bottom: 0;
-                z-index: 5;
+                position: relative;
+                z-index: 20;
                 pointer-events: none;
+                width: 100%;
             }
-            .text-base {
-                position: absolute;
-                top: 1px;
-                font-size: 13.5px;
-                font-weight: 700;
-                color: #000;
-                white-space: nowrap;
+            
+            .number { width: 22px; font-size: 13.5px; font-weight: 600; color: #666; flex-shrink: 0; }
+            .name-container { flex: 1; margin-right: 10px; }
+            .name { font-size: 13.5px; font-weight: 700; color: #000; line-height: 1.2; display: block; }
+            .name-full { font-weight: 400; font-size: 13px; }
+            
+            .dosage-duration {
+                display: flex;
+                flex-direction: row;
+                width: 45%;
+                justify-content: flex-end;
+                flex-shrink: 0;
             }
 
-            /* EXACT OFFSETS FROM PrescriptionRowLayout.tsx */
-            .number { left: 10px; width: 25px; color: #666; font-weight: 600; }
-            .name { left: 28px; }
-            .name-full { left: 28px; width: 680px; font-weight: 400; font-size: 13px; white-space: normal; }
-            .dosage { left: 316px; width: 230px; }
-            .duration { left: 554px; width: 160px; text-align: right; }
+            .dosage { font-size: 13.5px; font-weight: 700; text-align: right; flex: 1; margin-right: 10px; }
+            .duration { font-size: 13.2px; font-weight: 700; text-align: right; min-width: 60px; }
 
             .canvas-overlay { 
                 position: absolute; 
-                top: 0; left: 0; bottom: 0; width: 720px;
+                top: 0; left: 0; right: 0;
                 z-index: 10;
+                width: 100%;
+                pointer-events: none;
             }
 
             /* Footer Signature Layout */

@@ -131,7 +131,7 @@ const CalendarStrip = React.memo(({
     return (
         <View className="bg-white border-b border-gray-100">
             <Pressable onPress={onGoToToday} className="items-center py-2">
-                <Text className="text-lg mt-5 font-bold text-blue-500">{visibleMonth}</Text>
+                <Text className="text-lg mt-5 font-bold text-blue-600">{visibleMonth}</Text>
             </Pressable>
             <FlatList
                 ref={flatListRef}

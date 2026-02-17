@@ -152,7 +152,7 @@ export function ConsultationScreenContent(props: ConsultationScreenContentProps)
                 <View className="flex-row px-4 py-2 bg-[#F2F4F8] border-b border-gray-200">
                     <Text className="text-black font-bold text-base">{title}</Text>
                     <TouchableOpacity onPress={() => props.clearSection(sectionKey)}>
-                        <Icon icon={CONSULTATION_ICONS.trashOutline} size={20} color="#FF3B30" />
+                        <Icon icon={CONSULTATION_ICONS.trashOutline} size={24} color="#FF3B30" />
                     </TouchableOpacity>
                 </View>
                 {items.map((item, index) => (
@@ -161,7 +161,7 @@ export function ConsultationScreenContent(props: ConsultationScreenContentProps)
                         index={index}
                         prescription={{
                             ...item,
-                            height: item.height || (title === 'Prescriptions' ? 70 : 60),
+                            height: item.height || 32,
                         }}
                         onExpand={() => props.onExpandRow(sectionKey, item.id)}
                         onDelete={() => props.removeItem(sectionKey, item.id)}
@@ -172,7 +172,7 @@ export function ConsultationScreenContent(props: ConsultationScreenContentProps)
                         isErasing={false}
                         onDrawingActive={props.onDrawingActive}
                         onEdit={() => props.onEditRow(sectionKey, item)}
-                        showIndex
+                        showIndex={false}
                         isFullWidth={sectionKey !== 'prescriptions'}
                     />
                 ))}
@@ -218,7 +218,7 @@ export function ConsultationScreenContent(props: ConsultationScreenContentProps)
 
                 <ConsultationTabs activeTab={props.activeTab} onTabChange={props.onTabChange} />
 
-                <View className="bg-[#F2F4F8] p-1 min-h-[140px] flex-row max-h-[150px]">
+                <View className="bg-[#F2F4F8] p-1 min-h-[150px] flex-row max-h-[150px]">
                     <ScrollView
                         className="flex-1"
                         nestedScrollEnabled
@@ -259,7 +259,7 @@ export function ConsultationScreenContent(props: ConsultationScreenContentProps)
                                 activeOpacity={0.7}
                                 onPress={props.onEditCurrentInput}
                             >
-                                <Icon icon={CONSULTATION_ICONS.pencil} size={15} color="#007AFF" />
+                                <Icon icon={CONSULTATION_ICONS.pencil} size={20} color="#007AFF" />
                                 <Text className="text-[#007AFF] text-[13.5px] font-medium ml-1">Edit</Text>
                             </TouchableOpacity>
 
@@ -268,7 +268,7 @@ export function ConsultationScreenContent(props: ConsultationScreenContentProps)
                                 activeOpacity={0.7}
                                 onPress={props.onAddToCurrentSection}
                             >
-                                <Icon icon={CONSULTATION_ICONS.add} size={18} color="#007AFF" />
+                                <Icon icon={CONSULTATION_ICONS.add} size={22} color="#007AFF" />
                                 <Text className="text-[#007AFF] text-[13.5px] font-medium ml-1">Add</Text>
                             </TouchableOpacity>
                         </View>
@@ -299,7 +299,7 @@ export function ConsultationScreenContent(props: ConsultationScreenContentProps)
                                 onSubmitEditing={props.onAddToCurrentSection}
                                 multiline
                                 textAlignVertical="top"
-                                style={{ backgroundColor: 'transparent', paddingTop: 40 }}
+                                style={{ backgroundColor: 'transparent', paddingTop: 28 }}
                             />
                         </View>
 
@@ -308,7 +308,7 @@ export function ConsultationScreenContent(props: ConsultationScreenContentProps)
                             className="w-12 h-12 items-center justify-center -mr-2"
                             activeOpacity={0.7}
                         >
-                            <Icon icon={CONSULTATION_ICONS.brush} size={28} color="#007AFF" />
+                            <Icon icon={CONSULTATION_ICONS.brush} size={32} color="#007AFF" />
                         </TouchableOpacity>
                     </View>
 

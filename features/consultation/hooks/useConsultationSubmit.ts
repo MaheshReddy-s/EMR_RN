@@ -117,6 +117,7 @@ function mapSectionItems(items: ConsultationItem[]) {
             notes: item.notes,
             genericName: item.genericName,
             drawings: normalizeDrawings(item.drawings),
+            height: item.height,
         }));
 }
 

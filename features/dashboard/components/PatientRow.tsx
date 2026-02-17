@@ -42,7 +42,6 @@ const PatientRow = React.memo(({ item, onPress }: PatientRowProps) => (
             </View>
             <View className="flex-1">
                 <Text style={{ fontWeight: '600', fontSize: 17, color: '#000' }}>{item.patient_name}</Text>
-                <Text style={{ fontSize: 14, color: '#8E8E93', marginTop: 2 }}>{item.patient_mobile}</Text>
             </View>
         </View>
     </TouchableOpacity>

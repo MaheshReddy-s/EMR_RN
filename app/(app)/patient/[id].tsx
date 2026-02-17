@@ -92,20 +92,25 @@ export default function PatientSummaryScreen() {
                     </View>
                 ) : null}
 
-                <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
+                <View className="flex-1">
                     <PatientProfileBlock
                         patient={patient}
                         onEditProfile={openEditProfile}
                         onStartConsultation={handleStartConsultation}
                     />
+
                     <PatientSummarySection summary={summary} />
-                    <VisitHistorySection
-                        history={history}
-                        onOpenVisit={(visit) => { void visitDetails.openVisitDetails(visit); }}
-                        onPrintPDF={handlePrintPDF}
-                        onSharePDF={handleSharePDF}
-                    />
-                </ScrollView>
+
+                    <View className="flex-1">
+                        <VisitHistorySection
+                            history={history}
+                            onOpenVisit={(visit) => { void visitDetails.openVisitDetails(visit); }}
+                            onPrintPDF={handlePrintPDF}
+                            onSharePDF={handleSharePDF}
+                        />
+                    </View>
+                </View>
+
             </View>
 
             <VisitConsultationDetailsModal

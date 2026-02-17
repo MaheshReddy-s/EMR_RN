@@ -223,7 +223,7 @@ export function useDashboard() {
                     patientMobile,
                     status,
                     time: timeString,
-                    type: apt.appointment_type || 'Consultation',
+                    type: apt.reason_to_visit || 'Consultation',
                     isConsulted: apt.is_consulted,
                 };
             });
