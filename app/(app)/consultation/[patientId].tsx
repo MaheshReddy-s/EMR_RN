@@ -1,6 +1,5 @@
 import React, { useCallback, useRef, useState } from 'react';
-import { Alert, Platform } from 'react-native';
-import { ScrollView } from 'react-native-gesture-handler';
+import { Alert, Platform, ScrollView, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { EditProfileModal } from '@/components/patient/EditProfileModal';
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
@@ -11,7 +10,7 @@ import { ConsultationSuggestion, useConsultationSuggestions } from '@/features/c
 import { useConsultationSubmit } from '@/features/consultation/hooks/useConsultationSubmit';
 import { ConsultationItem, StrokeData } from '@/entities';
 import { useConsultation, TabType } from '@/hooks/useConsultation';
-import { ConsultationRepository } from '@/repositories';
+import { ConsultationRepository, MasterDataRepository } from '@/repositories';
 import { DraftService } from '@/services/draft-service';
 import { PdfService, PdfSection } from '@/services/pdf-service';
 
@@ -66,6 +65,7 @@ export default function ConsultationScreen() {
     const [previewHtml, setPreviewHtml] = useState('');
     const [previewData, setPreviewData] = useState<any>(null);
     const [followUpDate, setFollowUpDate] = useState<Date | null>(null);
+    const [editingPropertySuggestion, setEditingPropertySuggestion] = useState<ConsultationSuggestion | null>(null);
 
     const { patient, setPatient, isLoadingPatient, patientError, user, patientPhotos, patientLabs, isLoadingAssets, handleCapturePhoto } = useConsultationPatientData({
         patientId,
@@ -75,7 +75,7 @@ export default function ConsultationScreen() {
 
     useConsultationDraft({ patientId, consultation, restoreDraft });
 
-    const { suggestions, isLoadingSuggestions, onSuggestionSelect } = useConsultationSuggestions({
+    const { suggestions, isLoadingSuggestions, onSuggestionSelect, refreshSuggestions } = useConsultationSuggestions({
         activeTab,
         writingText,
         consultation,
@@ -130,9 +130,39 @@ export default function ConsultationScreen() {
         setIsPrintPreviewVisible(true);
     };
 
-    const addToCurrentSection = () => {
-        if (!writingText.trim() && currentInputStrokes.length === 0) return;
-        onSuggestionSelect({ id: Date.now().toString(), label: writingText.trim(), drawings: currentInputStrokes } as ConsultationSuggestion);
+    const addToCurrentSection = async () => {
+        const textToSave = writingText.trim();
+        if (!textToSave && currentInputStrokes.length === 0) return;
+
+        // 1. Add to current visit
+        onSuggestionSelect({
+            id: Date.now().toString(),
+            label: textToSave,
+            drawings: currentInputStrokes
+        } as ConsultationSuggestion);
+
+        // 2. Ask to save as master property (except prescriptions)
+        if (textToSave && activeTab !== 'prescriptions') {
+            Alert.alert(
+                'Save Property',
+                `Would you like to save "${textToSave}" to your master list of ${SECTION_LABELS[activeTab]}?`,
+                [
+                    { text: 'No', style: 'cancel' },
+                    {
+                        text: 'Yes, Save',
+                        onPress: async () => {
+                            try {
+                                await MasterDataRepository.addItem(activeTab as any, textToSave);
+                                await refreshSuggestions();
+                            } catch (error) {
+                                Alert.alert('Error', 'Failed to save master property');
+                            }
+                        }
+                    }
+                ]
+            );
+        }
+
         setWritingText('');
         setCurrentInputStrokes([]);
     };
@@ -149,6 +179,14 @@ export default function ConsultationScreen() {
         if (item) updateItem(section, id, { height: (item.height || 60) + 40 });
     };
 
+    const handleEditRow = (section: TabType, item: ConsultationItem) => {
+        setEditingItem({ section, id: item.id });
+        setEditingPropertySuggestion(null);
+        setEditModalTitle(`Edit ${SECTION_LABELS[section]}`);
+        setEditModalText(item.name);
+        setIsEditModalVisible(true);
+    };
+
     const handleClearAll = (section: TabType) => {
         Alert.alert('Clear All', `Are you sure you want to clear all items in ${SECTION_LABELS[section]}?`, [
             { text: 'Cancel', style: 'cancel' },
@@ -156,23 +194,83 @@ export default function ConsultationScreen() {
         ]);
     };
 
-    const handleEditRow = (section: TabType, item: ConsultationItem) => {
-        setEditingItem({ section, id: item.id });
-        setEditModalTitle(`Edit ${section}`);
-        setEditModalText(item.name);
-        setIsEditModalVisible(true);
-    };
-
     const handleEditCurrentInput = () => {
         setEditingItem(null);
-        setEditModalTitle(`Edit ${activeTab}`);
+        setEditingPropertySuggestion(null);
+        setEditModalTitle(`Edit ${SECTION_LABELS[activeTab]}`);
         setEditModalText(writingText);
         setIsEditModalVisible(true);
     };
 
-    const saveEditModal = () => {
-        if (editingItem) updateItem(editingItem.section, editingItem.id, { name: editModalText });
-        else setWritingText(editModalText);
+    const handleAddNewProperty = () => {
+        if (activeTab === 'prescriptions') {
+            Alert.alert('Info', 'Prescription property management is handled separately.');
+            return;
+        }
+        setEditingItem(null);
+        setEditingPropertySuggestion(null);
+        setEditModalTitle(`Add New ${SECTION_LABELS[activeTab]}`);
+        setEditModalText(writingText);
+        setIsEditModalVisible(true);
+    };
+
+    const handleEditProperty = (suggestion: ConsultationSuggestion) => {
+        setEditingItem(null);
+        setEditingPropertySuggestion(suggestion);
+        setEditModalTitle(`Edit ${SECTION_LABELS[activeTab]} Property`);
+        setEditModalText(suggestion.label);
+        setIsEditModalVisible(true);
+    };
+
+    const handleDeleteProperty = (suggestion: ConsultationSuggestion) => {
+        Alert.alert(
+            'Delete Property',
+            `Are you sure you want to delete "${suggestion.label}" from ${SECTION_LABELS[activeTab]} suggestions?`,
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Delete',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            const category = activeTab as any; // Cast for now, service handles checking
+                            await MasterDataRepository.deleteItem(category, suggestion.id);
+                            await refreshSuggestions();
+                        } catch (error) {
+                            Alert.alert('Error', 'Failed to delete property');
+                        }
+                    }
+                }
+            ]
+        );
+    };
+
+    const saveEditModal = async () => {
+        if (editingPropertySuggestion) {
+            // Edit Master Property
+            try {
+                const category = activeTab as any;
+                await MasterDataRepository.updateItem(category, editingPropertySuggestion.id, editModalText);
+                await refreshSuggestions();
+            } catch (error) {
+                Alert.alert('Error', 'Failed to update property');
+            }
+        } else if (editingItem) {
+            // Edit Consultation Row
+            updateItem(editingItem.section, editingItem.id, { name: editModalText });
+        } else if (editModalTitle.startsWith('Add New')) {
+            // Add NEW Master Property
+            try {
+                const category = activeTab as any;
+                await MasterDataRepository.addItem(category, editModalText);
+                await refreshSuggestions();
+            } catch (error) {
+                Alert.alert('Error', 'Failed to add property');
+            }
+        } else {
+            // Edit Draft Input
+            setWritingText(editModalText);
+        }
         setIsEditModalVisible(false);
     };
 
@@ -250,6 +348,9 @@ export default function ConsultationScreen() {
                 editModalText={editModalText}
                 setEditModalText={setEditModalText}
                 onSaveEditModal={saveEditModal}
+                onAddNewProperty={handleAddNewProperty}
+                onEditProperty={handleEditProperty}
+                onDeleteProperty={handleDeleteProperty}
             />
             <EditProfileModal
                 visible={isEditProfileVisible}

@@ -3,8 +3,10 @@ import { ScrollView, Switch, Text, View } from 'react-native';
 import SettingsSectionHeader from '@/features/settings/components/SettingsSectionHeader';
 import { CONSULTATION_SETTINGS_DATA } from '@/features/settings/constants';
 
+import type { AdvancedSettings } from '@/features/settings/types';
+
 interface ConsultationSettingsSectionProps {
-    settings: Record<string, boolean>;
+    settings: AdvancedSettings;
     onToggle: (id: string) => void;
     onProfilePress: () => void;
     onLogoutPress: () => void;

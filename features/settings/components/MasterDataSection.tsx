@@ -1,8 +1,9 @@
 import React from 'react';
-import { ActivityIndicator, RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, RefreshControl, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SETTINGS_ICONS } from '@/constants/icons';
 import { Icon } from '@/components/ui/Icon';
 import { DataEditModal } from '@/components/settings/DataEditModal';
+import PrescriptionModal from '@/components/consultation/prescription-modal';
 import SettingsSectionHeader from '@/features/settings/components/SettingsSectionHeader';
 import type { MasterDataItem } from '@/repositories';
 import type { SettingSection } from '@/features/settings/types';
@@ -19,10 +20,14 @@ interface MasterDataSectionProps {
     onOpenAddModal: () => void;
     onOpenEditModal: (item: MasterDataItem) => void;
     onCloseModal: () => void;
-    onSaveItem: (value: string) => Promise<void>;
+    onSaveItem: (value: string | any) => Promise<void>;
     onDeleteItem: (id: string) => Promise<void>;
     onDeleteAll: () => Promise<void>;
     onRefresh: () => Promise<void>;
+    searchQuery: string;
+    onSearchQueryChange: (query: string) => void;
+    isPrescriptionModalVisible?: boolean;
+    currentPrescriptionData?: any;
 }
 
 const MasterDataSection = ({
@@ -41,6 +46,10 @@ const MasterDataSection = ({
     onDeleteItem,
     onDeleteAll,
     onRefresh,
+    searchQuery,
+    onSearchQueryChange,
+    isPrescriptionModalVisible,
+    currentPrescriptionData,
 }: MasterDataSectionProps) => (
     <View className="flex-1 bg-white p-6">
         <SettingsSectionHeader
@@ -55,8 +64,16 @@ const MasterDataSection = ({
                 <Text className="ml-2 text-blue-500 font-medium text-base">Add {activeSection}</Text>
             </TouchableOpacity>
 
-            <View className="flex-row items-center gap-4">
-                <Icon icon={SETTINGS_ICONS.search} size={24} color="#9CA3AF" />
+            <View className="flex-row items-center gap-4 flex-1 justify-end">
+                <View className="flex-row items-center bg-gray-50 rounded-lg px-3 py-1.5 flex-1 max-w-[200px]">
+                    <Icon icon={SETTINGS_ICONS.search} size={18} color="#9CA3AF" />
+                    <TextInput
+                        className="ml-2 flex-1 text-sm text-gray-800 p-0"
+                        placeholder="Search..."
+                        value={searchQuery}
+                        onChangeText={onSearchQueryChange}
+                    />
+                </View>
                 <TouchableOpacity onPress={onDeleteAll} className="flex-row items-center">
                     <Icon icon={SETTINGS_ICONS.deleteOutline} size={20} color="#EF4444" />
                     <Text className="ml-1 text-red-500 font-medium">Delete All</Text>
@@ -103,6 +120,13 @@ const MasterDataSection = ({
             initialValue={editingItem?.name}
             onClose={onCloseModal}
             onSave={onSaveItem}
+        />
+
+        <PrescriptionModal
+            visible={isPrescriptionModalVisible || false}
+            onClose={onCloseModal}
+            onSave={onSaveItem}
+            initialData={currentPrescriptionData}
         />
     </View>
 );

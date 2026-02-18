@@ -91,14 +91,18 @@ export function safeFormatTimestamp(rawTimestamp: unknown): string {
 
     if (Number.isNaN(date.getTime())) return 'Unknown Date';
 
-    return date.toLocaleString('en-US', {
+    const datePart = date.toLocaleDateString('en-US', {
         day: 'numeric',
         month: 'short',
         year: 'numeric',
+    });
+    const timePart = date.toLocaleTimeString('en-US', {
         hour: 'numeric',
         minute: '2-digit',
         hour12: true,
     });
+
+    return `${datePart}\n${timePart}`;
 }
 
 /**

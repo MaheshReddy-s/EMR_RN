@@ -9,6 +9,7 @@ export interface Appointment {
     patientMobile: string;
     status: 'scheduled' | 'new-patient' | 'completed' | 'in-progress';
     time: string;
+    timestamp: number;
     type?: string;
     isConsulted?: boolean;
 }

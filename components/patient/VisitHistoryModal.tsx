@@ -203,7 +203,7 @@ export function VisitHistoryModal({ visible, onClose, patientId }: VisitHistoryM
                                 </View>
                             ) : (
                                 <View style={styles.centerContent}>
-                                    <Icon library="Ionicons" ios="document-text-outline" android="file-document-outline" size={80} color="#E5E7EB" />
+                                    <Icon library="Ionicons" ios="document-text-outline" android="document-text-outline" size={80} color="#E5E7EB" />
                                     <Text style={styles.placeholderText}>Select a visit history to view</Text>
                                 </View>
                             )}
@@ -238,14 +238,14 @@ export function VisitHistoryModal({ visible, onClose, patientId }: VisitHistoryM
                                                 <View style={styles.actionRow}>
                                                     <TouchableOpacity onPress={handlePrint} style={styles.actionButton}>
                                                         <View style={styles.actionIconContainer}>
-                                                            <Icon library="SFSymbols" ios="printer" android="printer" size={20} color="#007AFF" />
+                                                            <Icon library="Ionicons" ios="print-outline" android="print-outline" size={20} color="#007AFF" />
                                                         </View>
                                                         <Text style={styles.actionLabel}>Print</Text>
                                                     </TouchableOpacity>
 
                                                     <TouchableOpacity onPress={handleShare} style={styles.actionButton}>
                                                         <View style={styles.actionIconContainer}>
-                                                            <Icon library="SFSymbols" ios="square.and.arrow.up" android="share-variant" size={20} color="#007AFF" />
+                                                            <Icon library="Ionicons" ios="share-social-outline" android="share-social-outline" size={20} color="#007AFF" />
                                                         </View>
                                                         <Text style={styles.actionLabel}>Share</Text>
                                                     </TouchableOpacity>
@@ -381,7 +381,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#F9FAFB',
     },
     visitDate: {
-        textAlign: 'right',
+        textAlign: 'left',
         fontSize: 14,
     },
     selectedDate: {
@@ -395,7 +395,7 @@ const styles = StyleSheet.create({
     actionRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'flex-end',
+        justifyContent: 'flex-start',
         gap: 16,
         marginTop: 12,
     },

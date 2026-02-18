@@ -39,7 +39,10 @@ const AppointmentRow = React.memo(({ item, onPress }: AppointmentRowProps) => {
                     {item.type && <Text className="text-base text-gray-400">{item.type}</Text>}
                 </View>
             </View>
-            <View className={`flex-row items-center px-2 py-2 rounded-lg ${statusColorClass}`}>
+            <View
+                style={{ width: 105, justifyContent: 'center' }}
+                className={`flex-row items-center px-2 py-2 rounded-lg ${statusColorClass}`}
+            >
                 <Text className="text-white text-base font-medium">{item.time}</Text>
                 <Icon
                     icon={isCompleted ? DASHBOARD_ICONS.checkCircle : DASHBOARD_ICONS.chevronRight}

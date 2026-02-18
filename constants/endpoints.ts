@@ -55,6 +55,7 @@ export const API_ENDPOINTS = {
         LIST_ALL: '/properties',
         LIST_BY_DOCTOR: (doctorId: string) => `/properties/${doctorId}`,
         ADD_PROPERTY: (doctorId: string) => `/${doctorId}/properties`,
+        UPDATE_OR_DELETE: (doctorId: string, section: ConsultationSection) => `/properties/${doctorId}/${section}`,
 
         // Section specific suggestions
         SECTION: (doctorId: string, section: ConsultationSection) => `/properties/${doctorId}/${section}`,
@@ -69,7 +70,12 @@ export const API_ENDPOINTS = {
         RECENT: (doctorId: string, patientId: string) => `/consultation/recent-history/${doctorId}/${patientId}`,
         PDF_DOWNLOAD: (fileName: string) => `/consultation/history/${fileName}`,
         DELETE_HISTORY: (consultationId: string, historyId: string) => `/consultation/${consultationId}/${historyId}`,
-    }
+    },
+
+    SETTINGS: {
+        GET: (clinicId: string, doctorId: string) => `/settings/${clinicId}/${doctorId}`,
+        UPDATE: (clinicId: string, doctorId: string) => `/settings/${clinicId}/${doctorId}`,
+    },
 } as const;
 
 /**

@@ -1,11 +1,10 @@
 import React from 'react';
-import AdvancedSettingsSection from '@/features/settings/components/AdvancedSettingsSection';
+import AdvancedSettingsSection, { AdvancedSettingsComponentProps } from '@/features/settings/components/AdvancedSettingsSection';
 import ConsultationSettingsSection from '@/features/settings/components/ConsultationSettingsSection';
 import ComingSoonSection from '@/features/settings/components/ComingSoonSection';
 import MasterDataSection from '@/features/settings/components/MasterDataSection';
 import SectionsOrderSection from '@/features/settings/components/SectionsOrderSection';
-import type { SettingSection } from '@/features/settings/types';
-import type { ListItem } from '@/features/settings/types';
+import type { AdvancedSettings, ListItem, SettingSection } from '@/features/settings/types';
 import type { MasterDataItem } from '@/repositories';
 
 interface SettingsContentProps {
@@ -17,18 +16,24 @@ interface SettingsContentProps {
     modalTitle: string;
     editingItem: MasterDataItem | null;
     sectionsOrder: ListItem[];
-    consultationSettings: Record<string, boolean>;
+    consultationSettings: AdvancedSettings;
     onProfilePress: () => void;
     onLogoutPress: () => void;
     onOpenAddModal: () => void;
     onOpenEditModal: (item: MasterDataItem) => void;
     onCloseModal: () => void;
-    onSaveItem: (value: string) => Promise<void>;
+    onSaveItem: (value: string | any) => Promise<void>;
     onDeleteItem: (id: string) => Promise<void>;
     onDeleteAll: () => Promise<void>;
     onRefresh: () => Promise<void>;
     onSectionsOrderChange: (next: ListItem[]) => void;
+    onToggleSection: (key: string) => void;
     onToggleConsultationSetting: (id: string) => void;
+    searchQuery: string;
+    onSearchQueryChange: (query: string) => void;
+    advancedSettings: AdvancedSettingsComponentProps;
+    isPrescriptionModalVisible: boolean;
+    currentPrescriptionData: any;
 }
 
 const SettingsContent = ({
@@ -51,11 +56,18 @@ const SettingsContent = ({
     onDeleteAll,
     onRefresh,
     onSectionsOrderChange,
+    onToggleSection,
     onToggleConsultationSetting,
+    searchQuery,
+    onSearchQueryChange,
+    advancedSettings,
+    isPrescriptionModalVisible,
+    currentPrescriptionData,
 }: SettingsContentProps) => {
     if (activeSection === 'Advanced Settings') {
         return (
             <AdvancedSettingsSection
+                {...advancedSettings}
                 onProfilePress={onProfilePress}
                 onLogoutPress={onLogoutPress}
             />
@@ -67,6 +79,7 @@ const SettingsContent = ({
             <SectionsOrderSection
                 sectionsOrder={sectionsOrder}
                 onSectionsOrderChange={onSectionsOrderChange}
+                onToggleSection={onToggleSection}
                 onProfilePress={onProfilePress}
                 onLogoutPress={onLogoutPress}
             />
@@ -105,6 +118,10 @@ const SettingsContent = ({
             onDeleteItem={onDeleteItem}
             onDeleteAll={onDeleteAll}
             onRefresh={onRefresh}
+            searchQuery={searchQuery}
+            onSearchQueryChange={onSearchQueryChange}
+            isPrescriptionModalVisible={isPrescriptionModalVisible}
+            currentPrescriptionData={currentPrescriptionData}
         />
     );
 };

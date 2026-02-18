@@ -50,26 +50,14 @@ export const MasterDataService = {
      */
     async addItem(doctorId: string, category: MasterDataCategory, value: string): Promise<boolean> {
         if (category === 'prescription') {
-            // Prescriptions might have a different add endpoint/structure
-            // Swift: createPrescription -> POST /prescription
-            // Body needs more than just name? 
-            // MSNetworkManager.registerPrescription: 
-            // keys: medicine_name, medicine_type, etc.
-            // For now, let's assume simple name adding might not work for prescriptions 
-            // efficiently without more fields (variants).
-            // Let's defer simple string add for prescriptions or implement a complex one.
-            // For this POC, we might only support viewing/deleting prescriptions or simple add.
-
-            // Assuming simple add for now to match generic UI pattern
             await api.post(API_ENDPOINTS.PRESCRIPTIONS.CREATE(doctorId), {
                 medicine_name: value,
                 medicine_type: "Tablet", // Default
                 brand_name: value
             });
         } else {
-            // Generic Property Add
-            // Body: { property_name: category, property_value: value }
-            // Note: Generic endpoint ADD_PROPERTY is /:doctorId/properties
+            // New Specification: POST /v1/<doctor_id>/properties
+            // Payload: { "property_name": "diagnosis", "property_value": "..." }
             await api.post(API_ENDPOINTS.PROPERTIES.ADD_PROPERTY(doctorId), {
                 property_name: category,
                 property_value: value
@@ -83,17 +71,15 @@ export const MasterDataService = {
      */
     async updateItem(doctorId: string, category: MasterDataCategory, id: string, value: string): Promise<boolean> {
         if (category === 'prescription') {
-            // Prescription Update
             await api.put(API_ENDPOINTS.PRESCRIPTIONS.UPDATE(doctorId, id), {
                 medicine_name: value,
                 brand_name: value
             });
         } else {
-            // Generic Property Update: PUT /properties (which maps to add_property endpoint?)
-            // Swift uses 'edit' which POSTS to getPropertiesForPost but with PUT method?
-            // Wait, MSNetworkManager: edit -> PUT /:doctorId/properties 
-            // Body: { property_id: id, property_value: value }
-            await api.put(API_ENDPOINTS.PROPERTIES.ADD_PROPERTY(doctorId), {
+            // New Specification: PUT /v1/properties/<doctor_id>/<property_type>
+            // Payload: { "property_id": "...", "property_value": "..." }
+            const url = API_ENDPOINTS.PROPERTIES.UPDATE_OR_DELETE(doctorId, category as ConsultationSection);
+            await api.put(url, {
                 property_id: id,
                 property_value: value
             });
@@ -108,11 +94,9 @@ export const MasterDataService = {
         if (category === 'prescription') {
             await api.delete(API_ENDPOINTS.PRESCRIPTIONS.DELETE(doctorId, id));
         } else {
-            // Generic Property Delete
-            // DELETE /:doctorId/properties?property_id=ID
-            // Our API client might not support query params in delete automatically if path is fixed
-            // API_ENDPOINTS.PROPERTIES.ADD_PROPERTY gives base path.
-            const url = `${API_ENDPOINTS.PROPERTIES.ADD_PROPERTY(doctorId)}?property_id=${id}`;
+            // New Specification: DELETE /v1/properties/<doctor_id>/<property_type>?property_id=...
+            const baseUrl = API_ENDPOINTS.PROPERTIES.UPDATE_OR_DELETE(doctorId, category as ConsultationSection);
+            const url = `${baseUrl}?property_id=${id}`;
             await api.delete(url);
         }
         return true;

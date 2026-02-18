@@ -121,6 +121,10 @@ interface ConsultationScreenContentProps {
     editModalText: string;
     setEditModalText: (text: string) => void;
     onSaveEditModal: () => void;
+
+    onAddNewProperty: () => void;
+    onEditProperty: (suggestion: ConsultationSuggestion) => void;
+    onDeleteProperty: (suggestion: ConsultationSuggestion) => void;
 }
 
 export function ConsultationScreenContent(props: ConsultationScreenContentProps) {
@@ -234,14 +238,7 @@ export function ConsultationScreenContent(props: ConsultationScreenContentProps)
                         </View>
                     </ScrollView>
 
-                    <View className="justify-end">
-                        <TouchableOpacity
-                            onPress={() => { }}
-                            className="w-10 h-10 rounded-full bg-[#007AFF] items-center justify-center shadow-sm"
-                        >
-                            <Icon icon={CONSULTATION_ICONS.add} size={28} color="white" />
-                        </TouchableOpacity>
-                    </View>
+                    <View className="justify-end px-2 pb-2" />
                 </View>
 
                 <View className="px-4 py-3 bg-white">

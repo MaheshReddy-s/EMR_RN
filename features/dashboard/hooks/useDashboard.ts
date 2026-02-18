@@ -223,10 +223,11 @@ export function useDashboard() {
                     patientMobile,
                     status,
                     time: timeString,
+                    timestamp: apt.apt_timestamp,
                     type: apt.reason_to_visit || 'Consultation',
                     isConsulted: apt.is_consulted,
                 };
-            });
+            }).sort((a, b) => b.timestamp - a.timestamp);
 
             setAppointments(mappedAppointments);
         } catch (e) {

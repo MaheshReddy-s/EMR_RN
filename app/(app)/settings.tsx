@@ -41,7 +41,19 @@ export default function SettingsScreen() {
                             onDeleteAll={settings.handleDeleteAll}
                             onRefresh={settings.loadData}
                             onSectionsOrderChange={settings.setSectionsOrder}
+                            onToggleSection={settings.handleToggleSection}
                             onToggleConsultationSetting={settings.toggleConsultationSetting}
+                            searchQuery={settings.searchQuery}
+                            onSearchQueryChange={settings.setSearchQuery}
+                            advancedSettings={{
+                                settings: settings.advancedSettings,
+                                onChange: settings.handleAdvancedSettingChange,
+                                onSave: settings.handleSaveAdvancedSettings,
+                                isDirty: settings.isAdvancedSettingsDirty,
+                                isSaving: settings.isSavingAdvancedSettings,
+                            }}
+                            isPrescriptionModalVisible={settings.isPrescriptionModalVisible}
+                            currentPrescriptionData={settings.currentPrescriptionData}
                         />
                     </View>
                 </View>
