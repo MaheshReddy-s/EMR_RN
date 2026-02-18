@@ -15,6 +15,7 @@ import ConsultationTabs from '@/components/consultation/consultation-tabs';
 import DrawingCanvas from '@/components/consultation/drawing-canvas';
 import FollowUpModal from '@/components/consultation/follow-up-modal';
 import PrescriptionModal, { PrescriptionData } from '@/components/consultation/prescription-modal';
+import PrescriptionRowLayout from '@/components/consultation/prescription-row-layout';
 import PrintPreviewModal from '@/components/consultation/print-preview-modal';
 import type { FollowupInfoSelection } from '@/components/consultation/followup-info-modal';
 import { VisitHistoryModal } from '@/components/patient/VisitHistoryModal';
@@ -148,33 +149,53 @@ export function ConsultationScreenContent(props: ConsultationScreenContentProps)
         if (items.length === 0) return null;
 
         return (
-            <View className="mb-4">
-                <View className="flex-row px-4 py-2 bg-[#F2F4F8] border-b border-gray-200">
-                    <Text className="text-black font-bold text-base">{title}</Text>
+            <View className={props.isWeb ? 'mb-2' : 'mb-4'}>
+                <View className={`flex-row px-4 ${props.isWeb ? 'py-1' : 'py-2'} bg-[#F2F4F8] border-b border-gray-200`}>
+                    <Text className={`text-black font-bold ${props.isWeb ? 'text-[14px]' : 'text-base'}`}>{title}</Text>
                     <TouchableOpacity onPress={() => props.clearSection(sectionKey)}>
                         <Icon icon={CONSULTATION_ICONS.trashOutline} size={24} color="#FF3B30" />
                     </TouchableOpacity>
                 </View>
                 {items.map((item, index) => (
-                    <DrawingCanvas
-                        key={item.id}
-                        index={index}
-                        prescription={{
-                            ...item,
-                            height: item.height || 32,
-                        }}
-                        onExpand={() => props.onExpandRow(sectionKey, item.id)}
-                        onDelete={() => props.removeItem(sectionKey, item.id)}
-                        onStrokesChange={(strokes) => props.onStrokesChange(sectionKey, item.id, strokes)}
-                        initialDrawings={item.drawings}
-                        penColor={DEFAULT_PEN_COLOR}
-                        penThickness={DEFAULT_PEN_THICKNESS}
-                        isErasing={false}
-                        onDrawingActive={props.onDrawingActive}
-                        onEdit={() => props.onEditRow(sectionKey, item)}
-                        showIndex={false}
-                        isFullWidth={sectionKey !== 'prescriptions'}
-                    />
+                    props.isWeb ? (
+                        <PrescriptionRowLayout
+                            key={item.id}
+                            index={index}
+                            prescription={{
+                                ...item,
+                                height: item.height || 32,
+                            }}
+                            height={item.height || 32}
+                            onExpand={() => props.onExpandRow(sectionKey, item.id)}
+                            onDelete={() => props.removeItem(sectionKey, item.id)}
+                            onClear={() => props.onStrokesChange(sectionKey, item.id, [])}
+                            onEdit={() => props.onEditRow(sectionKey, item)}
+                            canClear={!!item.drawings && item.drawings.length > 0}
+                            renderCanvas={() => null}
+                            isFullWidth={sectionKey !== 'prescriptions'}
+                            style={{ marginBottom: 1 }}
+                        />
+                    ) : (
+                        <DrawingCanvas
+                            key={item.id}
+                            index={index}
+                            prescription={{
+                                ...item,
+                                height: item.height || 32,
+                            }}
+                            onExpand={() => props.onExpandRow(sectionKey, item.id)}
+                            onDelete={() => props.removeItem(sectionKey, item.id)}
+                            onStrokesChange={(strokes) => props.onStrokesChange(sectionKey, item.id, strokes)}
+                            initialDrawings={item.drawings}
+                            penColor={DEFAULT_PEN_COLOR}
+                            penThickness={DEFAULT_PEN_THICKNESS}
+                            isErasing={false}
+                            onDrawingActive={props.onDrawingActive}
+                            onEdit={() => props.onEditRow(sectionKey, item)}
+                            showIndex={false}
+                            isFullWidth={sectionKey !== 'prescriptions'}
+                        />
+                    )
                 ))}
             </View>
         );
@@ -202,146 +223,278 @@ export function ConsultationScreenContent(props: ConsultationScreenContentProps)
             ) : null}
 
             <View style={props.isWeb ? { width: '100%', maxWidth: 960, flex: 1 } : { flex: 1, width: '100%' }}>
-                <ConsultationHeader
-                    patientName={props.patient?.patient_name || 'Loading...'}
-                    patientMobile={props.patient?.patient_mobile || ''}
-                    patientAge={typeof props.patient?.age === 'string' ? parseInt(props.patient.age) : props.patient?.age}
-                    patientGender={props.patient?.gender}
-                    consultationDate={new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
-                    onBack={props.onBack}
-                    onNext={props.onNext}
-                    onEditProfile={() => props.setIsEditProfileVisible(true)}
-                    onViewHistory={() => props.setIsHistoryVisible(true)}
-                    onViewPhotographs={() => props.setIsPhotosVisible(true)}
-                    onViewLabReports={() => props.setIsLabsVisible(true)}
-                />
+                {props.isWeb ? (
+                    <ScrollView contentContainerStyle={{ flexGrow: 1 }} showsVerticalScrollIndicator={false}>
+                        <ConsultationHeader
+                            patientName={props.patient?.patient_name || 'Loading...'}
+                            patientMobile={props.patient?.patient_mobile || ''}
+                            patientAge={typeof props.patient?.age === 'string' ? parseInt(props.patient.age) : props.patient?.age}
+                            patientGender={props.patient?.gender}
+                            consultationDate={new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                            onBack={props.onBack}
+                            onNext={props.onNext}
+                            onEditProfile={() => props.setIsEditProfileVisible(true)}
+                            onViewHistory={() => props.setIsHistoryVisible(true)}
+                            onViewPhotographs={() => props.setIsPhotosVisible(true)}
+                            onViewLabReports={() => props.setIsLabsVisible(true)}
+                        />
 
-                <ConsultationTabs activeTab={props.activeTab} onTabChange={props.onTabChange} />
+                        <ConsultationTabs activeTab={props.activeTab} onTabChange={props.onTabChange} />
 
-                <View className="bg-[#F2F4F8] p-1 min-h-[150px] flex-row max-h-[150px]">
-                    <ScrollView
-                        className="flex-1"
-                        nestedScrollEnabled
-                        contentContainerStyle={{ paddingBottom: 10 }}
-                        showsVerticalScrollIndicator
-                    >
-                        <View className="flex-row flex-wrap items-start content-start">
-                            {props.isLoadingSuggestions ? (
-                                <ActivityIndicator size="small" color="#007AFF" />
-                            ) : (
-                                props.suggestions.map(renderSuggestionChip)
-                            )}
-                        </View>
-                    </ScrollView>
-
-                    <View className="justify-end">
-                        <TouchableOpacity
-                            onPress={() => { }}
-                            className="w-10 h-10 rounded-full bg-[#007AFF] items-center justify-center shadow-sm"
-                        >
-                            <Icon icon={CONSULTATION_ICONS.add} size={28} color="white" />
-                        </TouchableOpacity>
-                    </View>
-                </View>
-
-                <View className="px-4 py-3 bg-white">
-                    <View className="flex-row items-center mb-3">
-                        <Text className="text-gray-400 text-[13.5px] font-medium mr-1">
-                            Add or Search {TABS.find((t) => t.id === props.activeTab)?.label}:
-                        </Text>
-                        <Text className="text-black text-[14px] font-bold mr-3" numberOfLines={1}>
-                            {props.writingText || '...'}
-                        </Text>
-
-                        <View className="flex-row items-center gap-4">
-                            <TouchableOpacity
-                                className="flex-row items-center"
-                                activeOpacity={0.7}
-                                onPress={props.onEditCurrentInput}
+                        <View className="bg-[#F2F4F8] p-1 min-h-[50px] flex-row max-h-[180px]">
+                            <ScrollView
+                                className="flex-1"
+                                nestedScrollEnabled
+                                contentContainerStyle={{ paddingBottom: 4 }}
+                                showsVerticalScrollIndicator
                             >
-                                <Icon icon={CONSULTATION_ICONS.pencil} size={20} color="#007AFF" />
-                                <Text className="text-[#007AFF] text-[13.5px] font-medium ml-1">Edit</Text>
-                            </TouchableOpacity>
+                                <View className="flex-row flex-wrap items-start content-start">
+                                    {props.isLoadingSuggestions ? (
+                                        <ActivityIndicator size="small" color="#007AFF" />
+                                    ) : (
+                                        props.suggestions.map(renderSuggestionChip)
+                                    )}
+                                </View>
+                            </ScrollView>
 
-                            <TouchableOpacity
-                                className="flex-row items-center"
-                                activeOpacity={0.7}
-                                onPress={props.onAddToCurrentSection}
-                            >
-                                <Icon icon={CONSULTATION_ICONS.add} size={22} color="#007AFF" />
-                                <Text className="text-[#007AFF] text-[13.5px] font-medium ml-1">Add</Text>
-                            </TouchableOpacity>
+                            <View className="justify-end">
+                                <TouchableOpacity
+                                    onPress={() => { }}
+                                    className="w-8 h-8 rounded-full bg-[#007AFF] items-center justify-center shadow-sm"
+                                >
+                                    <Icon icon={CONSULTATION_ICONS.add} size={20} color="white" />
+                                </TouchableOpacity>
+                            </View>
                         </View>
-                    </View>
 
-                    <View className="flex-row items-center gap-2">
-                        <View className="flex-1 bg-white border border-gray-100 rounded-2xl h-32 shadow-sm relative overflow-hidden" style={{ elevation: 3, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 10 }}>
-                            <View className="absolute inset-0 z-10" pointerEvents="box-none">
-                                <DrawingCanvas
-                                    key={`input-canvas-${props.currentInputStrokes.length}`}
-                                    canvasOnly
-                                    initialDrawings={props.currentInputStrokes}
-                                    onStrokesChange={props.onCurrentInputStrokesChange}
-                                    penColor={DEFAULT_PEN_COLOR}
-                                    penThickness={DEFAULT_PEN_THICKNESS}
-                                    isErasing={false}
-                                    onDrawingActive={props.onDrawingActive}
-                                    style={{ flex: 1 }}
-                                />
+                        <View className="px-4 py-2 bg-white">
+                            <View className="flex-row items-center mb-2">
+                                <Text className="text-gray-400 text-[13px] font-medium mr-1">
+                                    Add or Search {TABS.find((t) => t.id === props.activeTab)?.label}:
+                                </Text>
+                                <Text className="text-black text-[13.5px] font-bold mr-3" numberOfLines={1}>
+                                    {props.writingText || '...'}
+                                </Text>
+
+                                <View className="flex-row items-center gap-4">
+                                    <TouchableOpacity
+                                        className="flex-row items-center"
+                                        activeOpacity={0.7}
+                                        onPress={props.onEditCurrentInput}
+                                    >
+                                        <Icon icon={CONSULTATION_ICONS.pencil} size={18} color="#007AFF" />
+                                        <Text className="text-[#007AFF] text-[13px] font-medium ml-1">Edit</Text>
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity
+                                        className="flex-row items-center"
+                                        activeOpacity={0.7}
+                                        onPress={props.onAddToCurrentSection}
+                                    >
+                                        <Icon icon={CONSULTATION_ICONS.add} size={20} color="#007AFF" />
+                                        <Text className="text-[#007AFF] text-[13px] font-medium ml-1">Add</Text>
+                                    </TouchableOpacity>
+                                </View>
                             </View>
 
-                            <TextInput
-                                className="absolute inset-0 z-20 text-[18px] text-gray-800 text-center px-4"
-                                placeholder="Write or Type here"
-                                placeholderTextColor="#ccc"
-                                value={props.writingText}
-                                onChangeText={props.onWritingTextChange}
-                                onSubmitEditing={props.onAddToCurrentSection}
-                                multiline
-                                textAlignVertical="top"
-                                style={{ backgroundColor: 'transparent', paddingTop: 28 }}
-                            />
+                            <View className="flex-row items-center gap-2">
+                                <View className="flex-1 bg-white border border-gray-100 rounded-xl h-12 shadow-sm relative overflow-hidden" style={{ elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 5 }}>
+                                    <View className="absolute inset-0 z-10" pointerEvents="box-none">
+                                        {null /* No drawing canvas on web */}
+                                    </View>
+
+                                    <TextInput
+                                        className="absolute inset-0 z-20 text-[16px] text-gray-800 text-left px-4"
+                                        placeholder="Write or Type here"
+                                        placeholderTextColor="#ccc"
+                                        value={props.writingText}
+                                        onChangeText={props.onWritingTextChange}
+                                        onSubmitEditing={props.onAddToCurrentSection}
+                                        multiline
+                                        textAlignVertical="top"
+                                        style={{ backgroundColor: 'transparent', paddingTop: 10 }}
+                                    />
+                                </View>
+
+                                <TouchableOpacity
+                                    onPress={props.onClearInput}
+                                    className="w-10 h-10 items-center justify-center -mr-2"
+                                    activeOpacity={0.7}
+                                >
+                                    <Icon icon={CONSULTATION_ICONS.brush} size={24} color="#007AFF" />
+                                </TouchableOpacity>
+                            </View>
+
+                            <View className={`flex-row items-center justify-end ${props.isWeb ? 'mt-2' : 'mt-4'}`}>
+                                <TouchableOpacity
+                                    onPress={() => props.onClearAll(props.activeTab)}
+                                    className="border border-[#007AFF] rounded-lg px-4 py-1.5 mr-3"
+                                >
+                                    <Text className="text-[#007AFF] text-[13.5px] font-medium">Clear All</Text>
+                                </TouchableOpacity>
+                                <Text className="text-black text-[18px] font-semibold tracking-tight min-w-[80px] text-right">
+                                    {props.elapsedTime}
+                                </Text>
+                            </View>
                         </View>
 
-                        <TouchableOpacity
-                            onPress={props.onClearInput}
-                            className="w-12 h-12 items-center justify-center -mr-2"
-                            activeOpacity={0.7}
-                        >
-                            <Icon icon={CONSULTATION_ICONS.brush} size={32} color="#007AFF" />
-                        </TouchableOpacity>
-                    </View>
+                        <View className={`flex-1 bg-white ${props.isWeb ? 'pb-8' : 'pb-24'}`}>
+                            <View className={props.isWeb ? 'mt-0' : 'mt-2'}>
+                                {(props.activeTab === 'complaints' || props.complaints.length > 0) && renderSectionRows(props.complaints, 'Complaints', 'complaints')}
+                                {(props.activeTab === 'diagnosis' || props.diagnoses.length > 0) && renderSectionRows(props.diagnoses, 'Diagnosis', 'diagnosis')}
+                                {(props.activeTab === 'examination' || props.examinations.length > 0) && renderSectionRows(props.examinations, 'Examination', 'examination')}
+                                {(props.activeTab === 'investigation' || props.investigations.length > 0) && renderSectionRows(props.investigations, 'Investigation', 'investigation')}
+                                {(props.activeTab === 'procedure' || props.procedures.length > 0) && renderSectionRows(props.procedures, 'Procedure', 'procedure')}
+                                {(props.activeTab === 'prescriptions' || props.prescriptions.length > 0) && renderSectionRows(props.prescriptions, 'Prescriptions', 'prescriptions')}
+                                {(props.activeTab === 'instruction' || props.instructions.length > 0) && renderSectionRows(props.instructions, 'Instruction', 'instruction')}
+                                {(props.activeTab === 'notes' || props.notes.length > 0) && renderSectionRows(props.notes, 'Notes', 'notes')}
+                            </View>
+                        </View>
+                    </ScrollView>
+                ) : (
+                    <>
+                        <ConsultationHeader
+                            patientName={props.patient?.patient_name || 'Loading...'}
+                            patientMobile={props.patient?.patient_mobile || ''}
+                            patientAge={typeof props.patient?.age === 'string' ? parseInt(props.patient.age) : props.patient?.age}
+                            patientGender={props.patient?.gender}
+                            consultationDate={new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                            onBack={props.onBack}
+                            onNext={props.onNext}
+                            onEditProfile={() => props.setIsEditProfileVisible(true)}
+                            onViewHistory={() => props.setIsHistoryVisible(true)}
+                            onViewPhotographs={() => props.setIsPhotosVisible(true)}
+                            onViewLabReports={() => props.setIsLabsVisible(true)}
+                        />
 
-                    <View className="flex-row items-center justify-end mt-4">
-                        <TouchableOpacity
-                            onPress={() => props.onClearAll(props.activeTab)}
-                            className="border border-[#007AFF] rounded-lg px-4 py-1.5 mr-3"
-                        >
-                            <Text className="text-[#007AFF] text-[13.5px] font-medium">Clear All</Text>
-                        </TouchableOpacity>
-                        <Text className="text-black text-[18px] font-semibold tracking-tight min-w-[80px] text-right">
-                            {props.elapsedTime}
-                        </Text>
-                    </View>
-                </View>
+                        <ConsultationTabs activeTab={props.activeTab} onTabChange={props.onTabChange} />
 
-                <ScrollView
-                    ref={props.scrollViewRef}
-                    className="flex-1 bg-white"
-                    contentContainerStyle={{ paddingBottom: 100 }}
-                    scrollEnabled={!props.isDrawingActive}
-                >
-                    <View className="mt-2">
-                        {(props.activeTab === 'complaints' || props.complaints.length > 0) && renderSectionRows(props.complaints, 'Complaints', 'complaints')}
-                        {(props.activeTab === 'diagnosis' || props.diagnoses.length > 0) && renderSectionRows(props.diagnoses, 'Diagnosis', 'diagnosis')}
-                        {(props.activeTab === 'examination' || props.examinations.length > 0) && renderSectionRows(props.examinations, 'Examination', 'examination')}
-                        {(props.activeTab === 'investigation' || props.investigations.length > 0) && renderSectionRows(props.investigations, 'Investigation', 'investigation')}
-                        {(props.activeTab === 'procedure' || props.procedures.length > 0) && renderSectionRows(props.procedures, 'Procedure', 'procedure')}
-                        {(props.activeTab === 'prescriptions' || props.prescriptions.length > 0) && renderSectionRows(props.prescriptions, 'Prescriptions', 'prescriptions')}
-                        {(props.activeTab === 'instruction' || props.instructions.length > 0) && renderSectionRows(props.instructions, 'Instruction', 'instruction')}
-                        {(props.activeTab === 'notes' || props.notes.length > 0) && renderSectionRows(props.notes, 'Notes', 'notes')}
-                    </View>
-                </ScrollView>
+                        <View className="bg-[#F2F4F8] p-1 min-h-[150px] flex-row max-h-[150px]">
+                            <ScrollView
+                                className="flex-1"
+                                nestedScrollEnabled
+                                contentContainerStyle={{ paddingBottom: 10 }}
+                                showsVerticalScrollIndicator
+                            >
+                                <View className="flex-row flex-wrap items-start content-start">
+                                    {props.isLoadingSuggestions ? (
+                                        <ActivityIndicator size="small" color="#007AFF" />
+                                    ) : (
+                                        props.suggestions.map(renderSuggestionChip)
+                                    )}
+                                </View>
+                            </ScrollView>
+
+                            <View className="justify-end">
+                                <TouchableOpacity
+                                    onPress={() => { }}
+                                    className="w-10 h-10 rounded-full bg-[#007AFF] items-center justify-center shadow-sm"
+                                >
+                                    <Icon icon={CONSULTATION_ICONS.add} size={28} color="white" />
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+
+                        <View className="px-4 py-3 bg-white">
+                            <View className="flex-row items-center mb-3">
+                                <Text className="text-gray-400 text-[13.5px] font-medium mr-1">
+                                    Add or Search {TABS.find((t) => t.id === props.activeTab)?.label}:
+                                </Text>
+                                <Text className="text-black text-[14px] font-bold mr-3" numberOfLines={1}>
+                                    {props.writingText || '...'}
+                                </Text>
+
+                                <View className="flex-row items-center gap-4">
+                                    <TouchableOpacity
+                                        className="flex-row items-center"
+                                        activeOpacity={0.7}
+                                        onPress={props.onEditCurrentInput}
+                                    >
+                                        <Icon icon={CONSULTATION_ICONS.pencil} size={20} color="#007AFF" />
+                                        <Text className="text-[#007AFF] text-[13.5px] font-medium ml-1">Edit</Text>
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity
+                                        className="flex-row items-center"
+                                        activeOpacity={0.7}
+                                        onPress={props.onAddToCurrentSection}
+                                    >
+                                        <Icon icon={CONSULTATION_ICONS.add} size={22} color="#007AFF" />
+                                        <Text className="text-[#007AFF] text-[13.5px] font-medium ml-1">Add</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+
+                            <View className="flex-row items-center gap-2">
+                                <View className="flex-1 bg-white border border-gray-100 rounded-2xl h-32 shadow-sm relative overflow-hidden" style={{ elevation: 3, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 10 }}>
+                                    <View className="absolute inset-0 z-10" pointerEvents="box-none">
+                                        <DrawingCanvas
+                                            key={`input-canvas-${props.currentInputStrokes.length}`}
+                                            canvasOnly
+                                            initialDrawings={props.currentInputStrokes}
+                                            onStrokesChange={props.onCurrentInputStrokesChange}
+                                            penColor={DEFAULT_PEN_COLOR}
+                                            penThickness={DEFAULT_PEN_THICKNESS}
+                                            isErasing={false}
+                                            onDrawingActive={props.onDrawingActive}
+                                            style={{ flex: 1 }}
+                                        />
+                                    </View>
+
+                                    <TextInput
+                                        className="absolute inset-0 z-20 text-[18px] text-gray-800 text-center px-4"
+                                        placeholder="Write or Type here"
+                                        placeholderTextColor="#ccc"
+                                        value={props.writingText}
+                                        onChangeText={props.onWritingTextChange}
+                                        onSubmitEditing={props.onAddToCurrentSection}
+                                        multiline
+                                        textAlignVertical="top"
+                                        style={{ backgroundColor: 'transparent', paddingTop: 28 }}
+                                    />
+                                </View>
+
+                                <TouchableOpacity
+                                    onPress={props.onClearInput}
+                                    className="w-12 h-12 items-center justify-center -mr-2"
+                                    activeOpacity={0.7}
+                                >
+                                    <Icon icon={CONSULTATION_ICONS.brush} size={32} color="#007AFF" />
+                                </TouchableOpacity>
+                            </View>
+
+                            <View className="flex-row items-center justify-end mt-4">
+                                <TouchableOpacity
+                                    onPress={() => props.onClearAll(props.activeTab)}
+                                    className="border border-[#007AFF] rounded-lg px-4 py-1.5 mr-3"
+                                >
+                                    <Text className="text-[#007AFF] text-[13.5px] font-medium">Clear All</Text>
+                                </TouchableOpacity>
+                                <Text className="text-black text-[18px] font-semibold tracking-tight min-w-[80px] text-right">
+                                    {props.elapsedTime}
+                                </Text>
+                            </View>
+                        </View>
+
+                        <ScrollView
+                            ref={props.scrollViewRef}
+                            className="flex-1 bg-white"
+                            contentContainerStyle={{ paddingBottom: 100 }}
+                            scrollEnabled={!props.isDrawingActive}
+                        >
+                            <View className="mt-2">
+                                {(props.activeTab === 'complaints' || props.complaints.length > 0) && renderSectionRows(props.complaints, 'Complaints', 'complaints')}
+                                {(props.activeTab === 'diagnosis' || props.diagnoses.length > 0) && renderSectionRows(props.diagnoses, 'Diagnosis', 'diagnosis')}
+                                {(props.activeTab === 'examination' || props.examinations.length > 0) && renderSectionRows(props.examinations, 'Examination', 'examination')}
+                                {(props.activeTab === 'investigation' || props.investigations.length > 0) && renderSectionRows(props.investigations, 'Investigation', 'investigation')}
+                                {(props.activeTab === 'procedure' || props.procedures.length > 0) && renderSectionRows(props.procedures, 'Procedure', 'procedure')}
+                                {(props.activeTab === 'prescriptions' || props.prescriptions.length > 0) && renderSectionRows(props.prescriptions, 'Prescriptions', 'prescriptions')}
+                                {(props.activeTab === 'instruction' || props.instructions.length > 0) && renderSectionRows(props.instructions, 'Instruction', 'instruction')}
+                                {(props.activeTab === 'notes' || props.notes.length > 0) && renderSectionRows(props.notes, 'Notes', 'notes')}
+                            </View>
+                        </ScrollView>
+                    </>
+                )}
 
                 <PrescriptionModal
                     visible={props.isPrescriptionModalVisible}

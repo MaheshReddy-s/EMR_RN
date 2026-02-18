@@ -48,25 +48,62 @@ export default function LoginScreen() {
         >
             <KeyboardAvoidingView
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                className="w-full justify-center items-center"
+                className="w-full flex-1 justify-center items-center"
             >
-                {/* Main Content Container - 70% width */}
-                <View className="w-[70%] items-center">
-
-                    {/* Logo - No Background */}
-                    <Image
-                        source={require('../../assets/images/logo.png')}
-                        className="w-[150px] h-[150px] mb-[10px]"
-                        resizeMode="contain"
-                    />
+                {/* Main Content Container */}
+                <View
+                    style={Platform.OS === 'web' ? {
+                        width: '100%',
+                        maxWidth: 500,
+                        maxHeight: 700,
+                        backgroundColor: 'white',
+                        borderRadius: 16,
+                        paddingVertical: 24,
+                        paddingHorizontal: 32,
+                        shadowColor: '#000',
+                        shadowOpacity: 0.08,
+                        shadowRadius: 24,
+                        elevation: 8,
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                    } : { width: '70%', alignItems: 'center' }}
+                >
+                    {/* Logo - Cropping container for web to remove image white space */}
+                    {Platform.OS === 'web' ? (
+                        <View style={{ height: 240, width: '100%', overflow: 'hidden', alignItems: 'center', justifyContent: 'center' }}>
+                            <Image
+                                source={require('../../assets/images/logo.png')}
+                                style={{ width: 400, height: 400 }}
+                                resizeMode="contain"
+                            />
+                        </View>
+                    ) : (
+                        <Image
+                            source={require('../../assets/images/logo.png')}
+                            className="w-[150px] h-[150px] mb-[10px]"
+                            resizeMode="contain"
+                        />
+                    )}
 
                     {/* Login Title */}
-                    <Text className="text-[33px] font-bold text-black mb-[30px]">
+                    <Text
+                        className="text-[33px] font-bold text-black"
+                        style={{
+                            marginTop: Platform.OS === 'web' ? -10 : 0,
+                            marginBottom: Platform.OS === 'web' ? 24 : 30
+                        }}
+                    >
                         Login
                     </Text>
 
                     {/* Username Field */}
-                    <View className="w-full h-[50px] bg-white border border-gray-300 rounded-[4px] mb-[20px] justify-center">
+                    <View className="w-full bg-white border border-gray-300 justify-center"
+                        style={{
+                            height: 50,
+                            borderRadius: Platform.OS === 'web' ? 8 : 4,
+                            marginBottom: Platform.OS === 'web' ? 12 : 20
+                        }}
+                    >
                         <TextInput
                             className="flex-1 text-[16px] text-black px-3"
                             placeholder="Email"
@@ -81,7 +118,13 @@ export default function LoginScreen() {
                     </View>
 
                     {/* Password Field */}
-                    <View className="w-full h-[50px] bg-white border border-gray-300 rounded-[4px] mb-[32px] justify-center">
+                    <View className="w-full bg-white border border-gray-300 justify-center"
+                        style={{
+                            height: 50,
+                            borderRadius: Platform.OS === 'web' ? 8 : 4,
+                            marginBottom: Platform.OS === 'web' ? 16 : 32
+                        }}
+                    >
                         <TextInput
                             className="flex-1 text-[16px] text-black px-3"
                             placeholder="Password"
@@ -97,7 +140,11 @@ export default function LoginScreen() {
 
                     {/* Submit Button */}
                     <TouchableOpacity
-                        className={`w-full h-[50px] rounded-[4px] justify-center items-center ${isLoading ? 'bg-blue-300' : 'bg-blue-500'}`}
+                        className={`w-full justify-center items-center ${isLoading ? 'bg-blue-300' : 'bg-blue-500'}`}
+                        style={{
+                            height: Platform.OS === 'web' ? 48 : 50,
+                            borderRadius: Platform.OS === 'web' ? 8 : 4
+                        }}
                         onPress={handleLogin}
                         activeOpacity={0.8}
                         disabled={isLoading}
@@ -113,6 +160,6 @@ export default function LoginScreen() {
 
                 </View>
             </KeyboardAvoidingView>
-        </ImageBackground>
+        </ImageBackground >
     );
 }

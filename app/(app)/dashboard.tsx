@@ -65,7 +65,7 @@ export default function DashboardScreen() {
     if (dashboard.isWeb && dashboard.isLargeScreen) {
         return (
             <View className="flex-1 bg-white" style={{ alignItems: 'center' }}>
-                <View style={{ width: '100%', maxWidth: 960, flex: 1, paddingHorizontal: 40, position: 'relative' }}>
+                <View style={{ width: '100%', maxWidth: 1000, flex: 1, paddingHorizontal: 16, position: 'relative' }}>
                     {content}
                 </View>
 

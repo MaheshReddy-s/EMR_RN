@@ -29,59 +29,59 @@ const DashboardSidebar = ({
     onDateSelect,
 }: DashboardSidebarProps) => {
     return (
-        <View className="w-72 bg-slate-900 h-full">
-            <View className="p-6 border-b border-slate-700">
-                <Text className="text-2xl font-bold text-white">AVANCE</Text>
+        <View className="w-60 bg-slate-900 h-full">
+            <View className="p-4 border-b border-slate-700">
+                <Text className="text-xl font-bold text-white">AVANCE</Text>
             </View>
 
-            <View className="p-4 border-b border-slate-700">
+            <View className="p-3 border-b border-slate-700">
                 <View className="flex-row items-center">
-                    <View className="w-12 h-12 rounded-full bg-teal-500 items-center justify-center mr-3">
-                        <Text className="text-white text-lg font-bold">S</Text>
+                    <View className="w-10 h-10 rounded-full bg-teal-500 items-center justify-center mr-3">
+                        <Text className="text-white text-base font-bold">S</Text>
                     </View>
                     <View className="flex-1">
-                        <Text className="text-white font-medium">
+                        <Text className="text-white font-medium text-sm">
                             {user ? `Dr. ${user.first_name || ''} ${user.last_name || ''}`.trim() : 'Doctor'}
                         </Text>
-                        <Text className="text-slate-400 text-xs">{user?.qualification || ''}</Text>
+                        <Text className="text-slate-400 text-[10px]">{user?.qualification || ''}</Text>
                     </View>
                 </View>
             </View>
 
-            <View className="p-4">
+            <View className="p-3">
                 <TouchableOpacity
                     onPress={() => onTabChange('appointments')}
-                    className={`flex-row items-center px-4 py-3 rounded-xl mb-2 ${activeTab === 'appointments' ? 'bg-blue-600' : 'bg-transparent'}`}
+                    className={`flex-row items-center px-3 py-2 rounded-xl mb-1.5 ${activeTab === 'appointments' ? 'bg-blue-600' : 'bg-transparent'}`}
                 >
-                    <Text className="mr-3">[A]</Text>
-                    <Text className={activeTab === 'appointments' ? 'text-white font-medium' : 'text-slate-300'}>
+                    <Text className="mr-3 text-xs">[A]</Text>
+                    <Text className={activeTab === 'appointments' ? 'text-white font-medium text-sm' : 'text-slate-300 text-sm'}>
                         Appointments
                     </Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
                     onPress={() => onTabChange('all-patients')}
-                    className={`flex-row items-center px-4 py-3 rounded-xl mb-2 ${activeTab === 'all-patients' ? 'bg-blue-600' : 'bg-transparent'}`}
+                    className={`flex-row items-center px-3 py-2 rounded-xl mb-1.5 ${activeTab === 'all-patients' ? 'bg-blue-600' : 'bg-transparent'}`}
                 >
-                    <Text className="mr-3">[P]</Text>
-                    <Text className={activeTab === 'all-patients' ? 'text-white font-medium' : 'text-slate-300'}>
+                    <Text className="mr-3 text-xs">[P]</Text>
+                    <Text className={activeTab === 'all-patients' ? 'text-white font-medium text-sm' : 'text-slate-300 text-sm'}>
                         All Patients
                     </Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity onPress={onSettingsPress} className="flex-row items-center px-4 py-3 rounded-xl mb-2">
-                    <Text className="mr-3">[S]</Text>
-                    <Text className="text-slate-300">Settings</Text>
+                <TouchableOpacity onPress={onSettingsPress} className="flex-row items-center px-3 py-2 rounded-xl mb-1.5">
+                    <Text className="mr-3 text-xs">[S]</Text>
+                    <Text className="text-slate-300 text-sm">Settings</Text>
                 </TouchableOpacity>
             </View>
 
-            <View className="p-4 mt-auto border-t border-slate-700">
-                <View className="flex-row items-center justify-between mb-3">
+            <View className="p-3 mt-auto border-t border-slate-700">
+                <View className="flex-row items-center justify-between mb-2">
                     <TouchableOpacity onPress={() => onNavigateMonth('prev')}>
                         <Text className="text-slate-400">{'<'}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity onPress={onGoToToday}>
-                        <Text className="text-slate-400 text-sm">{currentMonth}</Text>
+                        <Text className="text-slate-400 text-xs">{currentMonth}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity onPress={() => onNavigateMonth('next')}>
                         <Text className="text-slate-400">{'>'}</Text>

@@ -1,4 +1,6 @@
-import { ScrollView, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
+import { ScrollView, Text, TouchableOpacity, View, useWindowDimensions, Platform } from 'react-native';
+
+const isWeb = Platform.OS === 'web';
 
 type TabType = 'complaints' | 'diagnosis' | 'examination' | 'investigation' | 'procedure' | 'prescriptions' | 'instruction' | 'notes';
 
@@ -27,17 +29,23 @@ export default function ConsultationTabs({ activeTab, onTabChange }: Consultatio
             <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
-                pagingEnabled
+                pagingEnabled={!isWeb}
                 decelerationRate="fast"
                 snapToAlignment="start"
-                contentContainerStyle={{ alignItems: 'center' }}
+                contentContainerStyle={isWeb ? {
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: '100%',
+                    gap: 10
+                } : { alignItems: 'center' }}
+                style={isWeb ? { maxWidth: 1000, alignSelf: 'center' } : undefined}
             >
                 {tabs.map((tab, index) => (
-                    <View key={tab.key} style={{ width: tabWidth, flexDirection: 'row', alignItems: 'center' }}>
+                    <View key={tab.key} style={isWeb ? { flexDirection: 'row', alignItems: 'center' } : { width: tabWidth, flexDirection: 'row', alignItems: 'center' }}>
                         <TouchableOpacity
                             onPress={() => onTabChange(tab.key)}
-                            style={{ flex: 1 }}
-                            className={`py-3.5 items-center border-b-[3px] ${activeTab === tab.key
+                            style={isWeb ? undefined : { flex: 1 }}
+                            className={`${isWeb ? 'py-4 px-4 border-b-2' : 'py-3.5 items-center border-b-[3px]'} ${activeTab === tab.key
                                 ? 'border-[#007AFF]'
                                 : 'border-transparent'
                                 }`}
@@ -53,8 +61,8 @@ export default function ConsultationTabs({ activeTab, onTabChange }: Consultatio
                             </Text>
                         </TouchableOpacity>
 
-                        {/* Vertical Separator (except after the last item in a page or absolute last) */}
-                        {index !== tabs.length - 1 && (index + 1) % 4 !== 0 && (
+                        {/* Vertical Separator (except after the last item in a page or absolute last) - Hide on Web */}
+                        {!isWeb && index !== tabs.length - 1 && (index + 1) % 4 !== 0 && (
                             <View style={{ width: 1, height: 20, backgroundColor: '#E5E7EB' }} />
                         )}
                     </View>

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef } from 'react';
-import { FlatList, Pressable, Text, View } from 'react-native';
+import { FlatList, Platform, Pressable, Text, View } from 'react-native';
 import type { StripDateItem } from '@/features/dashboard/types';
 
 export interface CalendarStripProps {
@@ -58,6 +58,7 @@ const CalendarStrip = React.memo(({
     onGoToToday,
     visibleMonth,
 }: CalendarStripProps) => {
+    const isWeb = Platform.OS === 'web';
     const flatListRef = useRef<FlatList<StripDateItem> | null>(null);
     const hasScrolledToToday = useRef(false);
     const itemWidth = useMemo(() => (width - 32) / 7, [width]);
@@ -110,11 +111,11 @@ const CalendarStrip = React.memo(({
         return (
             <Pressable
                 onPress={() => onDateSelect(item.fullDate)}
-                style={{ width: itemWidth }}
-                className="items-center justify-center py-5"
+                className="items-center justify-center"
+                style={{ width: itemWidth, paddingVertical: isWeb ? 8 : 20 }}
             >
                 <View
-                    className="w-14 h-14 items-center justify-center"
+                    className={isWeb ? "w-10 h-10 items-center justify-center" : "w-14 h-14 items-center justify-center"}
                     style={{ backgroundColor: isSelected ? '#007AFF' : 'transparent', borderRadius: 5 }}
                 >
                     <Text className={`text-s leading-none ${isSelected ? 'text-white' : item.isToday ? 'text-blue-500' : 'text-gray-400'}`}>
@@ -126,12 +127,12 @@ const CalendarStrip = React.memo(({
                 </View>
             </Pressable>
         );
-    }, [itemWidth, onDateSelect, selectedDate]);
+    }, [itemWidth, onDateSelect, selectedDate, isWeb]);
 
     return (
         <View className="bg-white border-b border-gray-100">
-            <Pressable onPress={onGoToToday} className="items-center py-2">
-                <Text className="text-lg mt-5 font-bold text-blue-600">{visibleMonth}</Text>
+            <Pressable onPress={onGoToToday} className="items-center" style={{ paddingVertical: isWeb ? 4 : 8 }}>
+                <Text style={{ fontSize: isWeb ? 16 : 18, marginTop: isWeb ? 8 : 20, fontWeight: '700', color: '#2563EB' }}>{visibleMonth}</Text>
             </Pressable>
             <FlatList
                 ref={flatListRef}
@@ -139,7 +140,7 @@ const CalendarStrip = React.memo(({
                 showsHorizontalScrollIndicator={false}
                 data={allStripDates}
                 keyExtractor={(_, index) => index.toString()}
-                contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 12 }}
+                contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: isWeb ? 8 : 12 }}
                 snapToInterval={weekWidth}
                 decelerationRate="fast"
                 getItemLayout={(_, index) => ({

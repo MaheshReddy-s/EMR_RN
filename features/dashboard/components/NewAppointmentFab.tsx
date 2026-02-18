@@ -1,5 +1,5 @@
 import React from 'react';
-import { TouchableOpacity } from 'react-native';
+import { Platform, TouchableOpacity } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { DASHBOARD_ICONS } from '@/constants/icons';
 import { Icon } from '@/components/ui/Icon';
@@ -11,7 +11,10 @@ interface NewAppointmentFabProps {
 
 const NewAppointmentFab = ({ visible, onPress }: NewAppointmentFabProps) => {
     const insets = useSafeAreaInsets();
+    const isWeb = Platform.OS === 'web';
     if (!visible) return null;
+
+    const fabSize = isWeb ? 48 : 56;
 
     return (
         <TouchableOpacity
@@ -19,11 +22,11 @@ const NewAppointmentFab = ({ visible, onPress }: NewAppointmentFabProps) => {
             className="items-center justify-center"
             style={{
                 position: 'absolute',
-                right: 24,
-                bottom: Math.max(insets.bottom + 16, 24),
-                width: 56,
-                height: 56,
-                borderRadius: 28,
+                right: isWeb ? 16 : 24,
+                bottom: isWeb ? 20 : Math.max(insets.bottom + 16, 24),
+                width: fabSize,
+                height: fabSize,
+                borderRadius: fabSize / 2,
                 backgroundColor: '#2563EB',
                 zIndex: 50,
                 shadowColor: '#000',
@@ -33,7 +36,7 @@ const NewAppointmentFab = ({ visible, onPress }: NewAppointmentFabProps) => {
                 elevation: 5,
             }}
         >
-            <Icon icon={DASHBOARD_ICONS.calendarPlus} size={28} color="white" />
+            <Icon icon={DASHBOARD_ICONS.calendarPlus} size={isWeb ? 24 : 28} color="white" />
         </TouchableOpacity>
     );
 };

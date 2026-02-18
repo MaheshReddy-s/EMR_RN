@@ -9,6 +9,7 @@ import { useConsultationDraft } from '@/features/consultation/hooks/useConsultat
 import { useConsultationPatientData } from '@/features/consultation/hooks/useConsultationPatientData';
 import { ConsultationSuggestion, useConsultationSuggestions } from '@/features/consultation/hooks/useConsultationSuggestions';
 import { useConsultationSubmit } from '@/features/consultation/hooks/useConsultationSubmit';
+import { useConsultationPreFill } from '@/features/consultation/hooks/useConsultationPreFill';
 import { ConsultationItem, StrokeData } from '@/entities';
 import { useConsultation, TabType } from '@/hooks/useConsultation';
 import { ConsultationRepository } from '@/repositories';
@@ -73,7 +74,9 @@ export default function ConsultationScreen() {
         isLabsVisible,
     });
 
+
     useConsultationDraft({ patientId, consultation, restoreDraft });
+    useConsultationPreFill({ patientId, consultation, restoreDraft });
 
     const { suggestions, isLoadingSuggestions, onSuggestionSelect } = useConsultationSuggestions({
         activeTab,
@@ -150,10 +153,17 @@ export default function ConsultationScreen() {
     };
 
     const handleClearAll = (section: TabType) => {
-        Alert.alert('Clear All', `Are you sure you want to clear all items in ${SECTION_LABELS[section]}?`, [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Clear', style: 'destructive', onPress: () => clearSection(section) },
-        ]);
+        if (Platform.OS === 'web') {
+            const confirmed = window.confirm(`Are you sure you want to clear all items in ${SECTION_LABELS[section]}?`);
+            if (confirmed) {
+                clearSection(section);
+            }
+        } else {
+            Alert.alert('Clear All', `Are you sure you want to clear all items in ${SECTION_LABELS[section]}?`, [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Clear', style: 'destructive', onPress: () => clearSection(section) },
+            ]);
+        }
     };
 
     const handleEditRow = (section: TabType, item: ConsultationItem) => {
@@ -257,6 +267,6 @@ export default function ConsultationScreen() {
                 patient={patient}
                 onSave={(updated) => setPatient(updated)}
             />
-        </ErrorBoundary>
+        </ErrorBoundary >
     );
 }

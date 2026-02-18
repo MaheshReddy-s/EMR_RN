@@ -154,6 +154,19 @@ export const ConsultationRepository = {
     },
 
     /**
+     * Fetch the most recent consultation for context
+     */
+    async getRecentConsultation(patientId: string): Promise<Record<string, unknown>> {
+        assertTenantContext('getRecentConsultation');
+        try {
+            const { doctorId } = requireTenantContext();
+            return await ConsultationService.getRecentConsultation(doctorId, patientId);
+        } catch (error) {
+            throw normalizeApiError(error);
+        }
+    },
+
+    /**
      * Fetch prescription suggestions with the same cache/dedupe strategy.
      */
     async getPrescriptions(forceRefresh = false): Promise<any[]> {

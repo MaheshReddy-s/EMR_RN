@@ -1,5 +1,5 @@
 import React from 'react';
-import { FlatList, Text, View } from 'react-native';
+import { FlatList, Platform, Text, View } from 'react-native';
 import { useRenderCountGuard } from '@/hooks/useRenderCountGuard';
 import CalendarStrip from '@/features/dashboard/components/CalendarStrip';
 import SearchBar from '@/features/dashboard/components/SearchBar';
@@ -39,6 +39,8 @@ const AppointmentsPanel = ({
 }: AppointmentsPanelProps) => {
     useRenderCountGuard('AppointmentsPanel');
 
+    const isWeb = Platform.OS === 'web';
+
     return (
         <View style={{ display: activeTab === 'appointments' ? 'flex' : 'none', flex: 1 }}>
             <CalendarStrip
@@ -63,8 +65,8 @@ const AppointmentsPanel = ({
                 showsVerticalScrollIndicator={false}
                 ListEmptyComponent={
                     !isLoading ? (
-                        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 80 }}>
-                            <Text style={{ fontSize: 17, fontWeight: '600', color: '#8E8E93' }}>No Appointments</Text>
+                        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: isWeb ? 40 : 80 }}>
+                            <Text style={{ fontSize: isWeb ? 15 : 17, fontWeight: '600', color: '#8E8E93' }}>No Appointments</Text>
                         </View>
                     ) : null
                 }

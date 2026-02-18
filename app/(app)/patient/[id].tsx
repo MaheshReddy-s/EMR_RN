@@ -83,34 +83,60 @@ export default function PatientSummaryScreen() {
 
     return (
         <View className="flex-1 bg-white" style={isWeb ? { alignItems: 'center' } : {}}>
-            <View style={isWeb ? { width: '100%', maxWidth: 960, flex: 1 } : { flex: 1, width: '100%' }}>
-                <PatientScreenHeader onBack={() => router.back()} />
+            <View style={isWeb ? { width: '100%', maxWidth: 1000, flex: 1 } : { flex: 1, width: '100%' }}>
+                {!isWeb && <PatientScreenHeader onBack={() => router.back()} />}
 
                 {isLoading ? (
-                    <View style={{ position: 'absolute', top: 14, right: 20, zIndex: 10 }}>
+                    <View style={{ position: 'absolute', top: isWeb ? 10 : 14, right: 20, zIndex: 10 }}>
                         <ActivityIndicator size="small" color="#007AFF" />
                     </View>
                 ) : null}
 
                 <View className="flex-1">
-                    <PatientProfileBlock
-                        patient={patient}
-                        onEditProfile={openEditProfile}
-                        onStartConsultation={handleStartConsultation}
-                    />
+                    {isWeb ? (
+                        <ScrollView
+                            className="flex-1"
+                            contentContainerStyle={{ flexGrow: 1 }}
+                            showsVerticalScrollIndicator={false}
+                        >
+                            <PatientScreenHeader onBack={() => router.back()} />
 
-                    <PatientSummarySection summary={summary} />
+                            <PatientProfileBlock
+                                patient={patient}
+                                onEditProfile={openEditProfile}
+                                onStartConsultation={handleStartConsultation}
+                            />
 
-                    <View className="flex-1">
-                        <VisitHistorySection
-                            history={history}
-                            onOpenVisit={(visit) => { void visitDetails.openVisitDetails(visit); }}
-                            onPrintPDF={handlePrintPDF}
-                            onSharePDF={handleSharePDF}
-                        />
-                    </View>
+                            <PatientSummarySection summary={summary} />
+
+                            <VisitHistorySection
+                                history={history}
+                                onOpenVisit={(visit) => { void visitDetails.openVisitDetails(visit); }}
+                                onPrintPDF={handlePrintPDF}
+                                onSharePDF={handleSharePDF}
+                            />
+                        </ScrollView>
+                    ) : (
+                        <View className="flex-1">
+                            <PatientProfileBlock
+                                patient={patient}
+                                onEditProfile={openEditProfile}
+                                onStartConsultation={handleStartConsultation}
+                            />
+
+                            <PatientSummarySection summary={summary} />
+
+                            <View className="flex-1">
+                                <VisitHistorySection
+                                    history={history}
+                                    onOpenVisit={(visit) => { void visitDetails.openVisitDetails(visit); }}
+                                    onPrintPDF={handlePrintPDF}
+                                    onSharePDF={handleSharePDF}
+                                />
+                            </View>
+                        </View>
+                    )}
                 </View>
-
             </View>
 
             <VisitConsultationDetailsModal

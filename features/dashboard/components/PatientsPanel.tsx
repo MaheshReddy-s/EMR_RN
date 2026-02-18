@@ -1,5 +1,5 @@
 import React from 'react';
-import { FlatList, Text, View } from 'react-native';
+import { FlatList, Platform, Text, View } from 'react-native';
 import { useRenderCountGuard } from '@/hooks/useRenderCountGuard';
 import SearchBar from '@/features/dashboard/components/SearchBar';
 import PatientRow from '@/features/dashboard/components/PatientRow';
@@ -33,7 +33,7 @@ const PatientsPanel = ({
     onMomentumScrollBegin,
     onPatientPress,
 }: PatientsPanelProps) => {
-    useRenderCountGuard('PatientsPanel');
+    const isWeb = Platform.OS === 'web';
 
     return (
         <View style={{ display: activeTab === 'all-patients' ? 'flex' : 'none', flex: 1 }}>
@@ -56,14 +56,14 @@ const PatientsPanel = ({
                 onMomentumScrollBegin={onMomentumScrollBegin}
                 ListEmptyComponent={
                     !isLoading ? (
-                        <View className="flex-1 items-center justify-center py-20">
-                            <Text style={{ fontSize: 17, fontWeight: '600', color: '#8E8E93' }}>No Patients</Text>
+                        <View className={`flex-1 items-center justify-center ${isWeb ? 'py-10' : 'py-20'}`}>
+                            <Text style={{ fontSize: isWeb ? 15 : 17, fontWeight: '600', color: '#8E8E93' }}>No Patients</Text>
                         </View>
                     ) : null
                 }
                 ListFooterComponent={
                     isFetchingMore ? (
-                        <View className="py-4 items-center">
+                        <View className={`${isWeb ? 'py-2' : 'py-4'} items-center`}>
                             <Text className="text-gray-400">Loading more...</Text>
                         </View>
                     ) : null
