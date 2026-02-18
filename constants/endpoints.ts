@@ -28,7 +28,7 @@ export const API_ENDPOINTS = {
     PATIENTS: {
         LIST: (doctorId: string) => `/${doctorId}/patients`,
         REGISTER: (doctorId: string) => `/${doctorId}/patient/register`,
-        SEARCH: (doctorId: string) => `/patient/search`,
+        SEARCH: (clinicId: string) => `/${clinicId}/patient/search`,
         ALL_PATIENT_DOCS: (clinicId: string, patientId: string) => `/all-patients-docs/${clinicId}/${patientId}`,
         DETAILS: (patientId: string) => `/patient/${patientId}`,
         UPDATE: (patientId: string) => `/patient/${patientId}`,

@@ -154,7 +154,7 @@ export default function VisitConsultationDetailsModal({
                                             });
 
                                             // Convert logical Y (0-820) back to screen Y (relative to 720 container)
-                                            const screenMaxY = (maxY * 720 / 820) + 5.6; // Reduced bottom padding cushion
+                                            const screenMaxY = (maxY * 720 / 820) + 6; // Removed bottom padding cushion
                                             calculatedMinHeight = Math.max(calculatedMinHeight, screenMaxY);
                                         }
 
@@ -165,33 +165,81 @@ export default function VisitConsultationDetailsModal({
                                                 style={{ minHeight: calculatedMinHeight }}
                                             >
                                                 {/* Text Layer */}
-                                                <View className="px-2 pt-[5.6px] pb-[5.6px] z-20">
+                                                <View className=" z-20">
                                                     <View className="flex-row items-start">
                                                         {isPrescription && row.name ? (
                                                             <>
                                                                 <View className="flex-1">
-                                                                    <Text className="text-gray-900 font-bold text-[13.5px]" numberOfLines={2}>
-                                                                        {row.name}
-                                                                    </Text>
-                                                                </View>
-                                                                <View className="flex-row items-start justify-end ml-2" style={{ width: '45%' }}>
-                                                                    <Text className="text-gray-700 font-bold text-[13.5px] text-right flex-1" numberOfLines={1}>
-                                                                        {row.dosage}
-                                                                    </Text>
-                                                                    <Text className="text-gray-900 font-bold text-[13.2px] text-right ml-2" style={{ minWidth: 60 }} numberOfLines={1}>
-                                                                        {row.duration}
-                                                                    </Text>
+                                                                    {/* Row 1: Name - Timings - Duration */}
+                                                                    <View style={{ height: 25, position: 'relative', width: '100%' }}>
+                                                                        {isPrescription && (
+                                                                            <Text
+                                                                                style={{ position: 'absolute', left: 4, top: 1, width: 20 }}
+                                                                                className="text-gray-500 font-bold text-[13.5px]"
+                                                                            >
+                                                                                {index + 1}.
+                                                                            </Text>
+                                                                        )}
+                                                                        <Text
+                                                                            style={{ position: 'absolute', left: 28, top: 1, right: '45%' }}
+                                                                            className="text-gray-900 font-bold text-[13.5px]"
+                                                                            numberOfLines={1}
+                                                                        >
+                                                                            {row.name}
+                                                                        </Text>
+                                                                        <View style={{ position: 'absolute', left: '43%', top: 1, width: '33%' }}>
+                                                                            <Text className="text-gray-700 font-bold text-[13.5px] text-left" numberOfLines={1}>
+                                                                                {row.timings}
+                                                                            </Text>
+                                                                        </View>
+                                                                        <Text
+                                                                            style={{ position: 'absolute', right: 10, top: 1 }}
+                                                                            className="text-gray-900 font-bold text-[13.2px] text-right"
+                                                                            numberOfLines={1}
+                                                                        >
+                                                                            {row.duration}
+                                                                        </Text>
+                                                                    </View>
+
+                                                                    {/* Row 2: Dosage - Instructions */}
+                                                                    {(row.dosage || row.instructions) && (
+                                                                        <View style={{ height: 20, marginTop: 1, position: 'relative', width: '100%' }}>
+                                                                            <Text
+                                                                                style={{ position: 'absolute', left: 10, top: 0, width: '40%' }}
+                                                                                className="text-gray-900 text-[13.5px]"
+                                                                                numberOfLines={1}
+                                                                            >
+                                                                                {row.dosage}
+                                                                            </Text>
+                                                                            <Text
+                                                                                style={{ position: 'absolute', left: '43%', top: 0, right: 10 }}
+                                                                                className="text-gray-900 text-[13.5px] italic"
+                                                                                numberOfLines={1}
+                                                                            >
+                                                                                {row.instructions}
+                                                                            </Text>
+                                                                        </View>
+                                                                    )}
                                                                 </View>
                                                             </>
                                                         ) : (
                                                             <View className="flex-1">
-                                                                <Text
-                                                                    className="text-gray-900 font-bold"
-                                                                    style={{ fontSize: 13.5 }}
-                                                                    numberOfLines={2}
-                                                                >
-                                                                    {row.text}
-                                                                </Text>
+                                                                <View style={{ minHeight: 22, justifyContent: 'center' }}>
+                                                                    <Text
+                                                                        className="text-[#495057] text-[13.5px]"
+                                                                        style={{ paddingLeft: 10, fontWeight: '400' }}
+                                                                        numberOfLines={2}
+                                                                    >
+                                                                        {row.name || row.text}
+                                                                    </Text>
+                                                                </View>
+                                                                {row.notes ? (
+                                                                    <View style={{ paddingLeft: 10, marginTop: 2 }}>
+                                                                        <Text className="text-[#6c757d] text-[13.5px]">
+                                                                            {row.notes}
+                                                                        </Text>
+                                                                    </View>
+                                                                ) : null}
                                                             </View>
                                                         )}
                                                     </View>

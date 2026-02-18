@@ -79,10 +79,11 @@ export const PatientService = {
     /**
      * Search for patients by name or mobile
      */
-    async searchPatients(doctorId: string, query: string): Promise<Patient[]> {
+    async searchPatients(clinicId: string, query: string): Promise<Patient[]> {
         try {
-            const data = await api.post<any>(API_ENDPOINTS.PATIENTS.SEARCH(doctorId), {
-                search_by: isNaN(Number(query)) ? 'patient_name' : 'patient_mobile',
+            const isMobileNumber = /^\d+$/.test(query);
+            const data = await api.post<any>(API_ENDPOINTS.PATIENTS.SEARCH(clinicId), {
+                search_by: isMobileNumber ? 'patient_mobile' : 'patient_name',
                 value: query
             });
 

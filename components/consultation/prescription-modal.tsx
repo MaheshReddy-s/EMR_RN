@@ -19,27 +19,27 @@ import type { PrescriptionVariant, PrescriptionData } from '@/entities/consultat
 interface PrescriptionModalProps {
     visible: boolean;
     onClose: () => void;
-    onSave: (data: PrescriptionData) => void;
+    onApplyVariant: (variant: PrescriptionVariant, brandName: string, genericName: string) => void;
     initialData?: PrescriptionData;
 }
 
 const DEFAULT_VARIANT: PrescriptionVariant = {
     id: '1',
-    timings: 'M-A-O-O',
+    timings: 'M-A-E-N',
     dosage: 'N/A',
     duration: '15 Days',
-    type: '',
+    type: 'Tablet',
 };
 
 export default function PrescriptionModal({
     visible,
     onClose,
-    onSave,
+    onApplyVariant,
     initialData,
 }: PrescriptionModalProps) {
     const [brandName, setBrandName] = useState('');
     const [genericName, setGenericName] = useState('');
-    const [variants, setVariants] = useState<PrescriptionVariant[]>([DEFAULT_VARIANT]);
+    const [variants, setVariants] = useState<PrescriptionVariant[]>([]);
 
     // Detail/Edit Modal State
     const [isEditModalVisible, setIsEditModalVisible] = useState(false);
@@ -57,19 +57,15 @@ export default function PrescriptionModal({
         }
     }, [initialData, visible]);
 
-    const handleMainSave = () => {
-        onSave({
-            brandName,
-            genericName,
-            variants,
-        });
+    const handleSaveMain = () => {
+        // This could be used for saving the master data changes if needed
+        // For now, we'll just follow the "True icon adds variant" flow
     };
 
     // --- Sub-Modal Handlers ---
 
     const handleAddVariant = () => {
-        // Prepare empty/"new" data for the detail modal
-        setEditingVariant(null); // null tells the sub-modal it's a new entry
+        setEditingVariant(null);
         setIsEditModalVisible(true);
     };
 
@@ -79,18 +75,13 @@ export default function PrescriptionModal({
     };
 
     const handleDetailSave = (data: PrescriptionData) => {
-        // The detailed modal returns a single variant in the `variants` array (index 0)
         const incomingVariant = data.variants[0];
-
-        // Ensure we capture brand/generic names if they changed in the detail view
         setBrandName(data.brandName);
         setGenericName(data.genericName);
 
         if (editingVariant) {
-            // We were editing an existing variant, so update it in the list
             setVariants(prev => prev.map(v => v.id === incomingVariant.id ? incomingVariant : v));
         } else {
-            // We were adding a new one
             setVariants(prev => [...prev, incomingVariant]);
         }
 
@@ -105,94 +96,91 @@ export default function PrescriptionModal({
             transparent={true}
             onRequestClose={onClose}
         >
-            <SafeAreaView className="flex-1 bg-black/50 justify-center items-center p-5">
-                <View className="w-full max-w-3xl h-[80%] bg-white rounded-2xl overflow-hidden shadow-lg">
-                    {/* Header */}
-                    <View className="h-16 bg-white border-b border-gray-100 flex-row items-center justify-between px-4">
-                        <TouchableOpacity onPress={onClose} className="p-2">
+            <View className="flex-1 bg-black/40 justify-center items-center p-4">
+                <View className="w-full max-w-3xl h-[85%] bg-white rounded-xl shadow-2xl overflow-hidden">
+                    {/* Header Controls */}
+                    <View className="flex-row justify-between items-center px-4 py-3 border-b border-gray-100">
+                        <TouchableOpacity onPress={onClose} className="p-1">
                             <Icon icon={PRESCRIPTION_MODAL_ICONS.close} size={28} color="#007AFF" />
                         </TouchableOpacity>
-                        <Text className="text-lg font-bold text-black">Prescription</Text>
-                        <View className="flex-row items-center gap-2">
-                            {/* Add Button triggers the DETAIL modal for a new item */}
-                            <TouchableOpacity onPress={handleAddVariant} className="flex-row items-center bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-100">
-                                <Icon icon={PRESCRIPTION_MODAL_ICONS.add} size={20} color="#007AFF" />
-                                <Text className="ml-1 text-[#007AFF] font-medium">Add</Text>
-                            </TouchableOpacity>
-
-                            {/* Save Button for the whole prescription transaction */}
-                            <TouchableOpacity onPress={handleMainSave} className="bg-[#007AFF] px-4 py-2 rounded-lg">
-                                <Text className="text-white font-semibold">Save All</Text>
-                            </TouchableOpacity>
-                        </View>
+                        <TouchableOpacity onPress={handleAddVariant} className="p-1">
+                            <Icon icon={PRESCRIPTION_MODAL_ICONS.add} size={28} color="#007AFF" />
+                        </TouchableOpacity>
                     </View>
 
-                    <ScrollView className="flex-1 p-4" keyboardShouldPersistTaps="handled">
-                        {/* Fields (ReadOnly or Editable?) - Let's keep them editable at top level too */}
-                        <View className="mb-6">
-                            <View className="flex-row items-center mb-3">
-                                <Text className="w-28 text-base font-semibold text-gray-700">Brand Name</Text>
-                                <TextInput
-                                    className="flex-1 h-11 border border-gray-200 rounded-lg px-3 bg-gray-50"
-                                    value={brandName}
-                                    onChangeText={setBrandName}
-                                    placeholder="Enter brand name"
-                                />
-                            </View>
-                            <View className="flex-row items-center mb-3">
-                                <Text className="w-28 text-base font-semibold text-gray-700">Generic Name</Text>
-                                <TextInput
-                                    className="flex-1 h-11 border border-gray-200 rounded-lg px-3 bg-gray-50"
-                                    value={genericName}
-                                    onChangeText={setGenericName}
-                                    placeholder="Enter generic name"
-                                />
-                            </View>
-                        </View>
-
-                        {/* Variants Table Header */}
-                        <View className="flex-row py-2 border-b border-gray-200 mb-2 bg-gray-50 px-2 rounded-t-lg">
-                            <Text className="w-10 text-[10px] font-bold text-gray-500 uppercase">S. No.</Text>
-                            <Text className="flex-[2] text-[10px] font-bold text-gray-500 uppercase">Timings</Text>
-                            <Text className="flex-1 text-[10px] font-bold text-gray-500 uppercase">Dosage</Text>
-                            <Text className="flex-[1.5] text-[10px] font-bold text-gray-500 uppercase">Duration</Text>
-                            <Text className="flex-1 text-[10px] font-bold text-gray-500 uppercase">Type</Text>
-                            <View className="w-16" />
-                        </View>
-
-                        {/* Variants List */}
-                        {variants.map((variant, index) => (
-                            <View key={variant.id} className="flex-row items-center py-3 border-b border-gray-100 px-2">
-                                <Text className="w-10 text-sm text-black">{index + 1}</Text>
-
-                                <Text className="flex-[2] text-sm text-black">{variant.timings}</Text>
-                                <Text className="flex-1 text-sm text-black">{variant.dosage}</Text>
-                                <Text className="flex-[1.5] text-sm text-black">{variant.duration}</Text>
-                                <Text className="flex-1 text-sm text-black">{variant.type}</Text>
-
-                                <View className="flex-row items-center w-16 justify-end gap-2">
-                                    <TouchableOpacity onPress={() => handleEditVariant(variant)}>
-                                        <Icon icon={PRESCRIPTION_MODAL_ICONS.createOutline} size={20} color="#007AFF" />
-                                    </TouchableOpacity>
-                                    <TouchableOpacity onPress={() => {
-                                        setVariants(prev => prev.filter(v => v.id !== variant.id));
-                                    }}>
-                                        <Icon icon={PRESCRIPTION_MODAL_ICONS.trashOutline} size={20} color="#FF3B30" />
-                                    </TouchableOpacity>
+                    <View className="px-6 py-4">
+                        {/* Brand & Generic Name Row */}
+                        <View className="flex-row items-end gap-4 mb-6">
+                            <View className="flex-1 gap-4">
+                                <View className="flex-row items-center">
+                                    <Text className="w-28 text-md font-bold text-black">Brand Name</Text>
+                                    <TextInput
+                                        className="flex-1 h-10 border border-gray-200 rounded px-3 text-md text-black bg-white"
+                                        value={brandName}
+                                        onChangeText={setBrandName}
+                                    />
+                                </View>
+                                <View className="flex-row items-center">
+                                    <Text className="w-28 text-md font-bold text-black">Generic Name</Text>
+                                    <TextInput
+                                        className="flex-1 h-10 border border-gray-200 rounded px-3 text-md text-black bg-white"
+                                        value={genericName}
+                                        onChangeText={setGenericName}
+                                    />
                                 </View>
                             </View>
-                        ))}
+                            <TouchableOpacity
+                                onPress={handleSaveMain}
+                                className="bg-[#007AFF] px-6 py-2 rounded shadow-sm"
+                            >
+                                <Text className="text-white font-bold">Save</Text>
+                            </TouchableOpacity>
+                        </View>
 
-                        {variants.length === 0 && (
-                            <View className="py-8 items-center justify-center">
-                                <Text className="text-gray-400">No details added yet.</Text>
+                        {/* Variants Table */}
+                        <View className="flex-1 min-h-[400px]">
+                            {/* Table Header */}
+                            <View className="flex-row border-b border-gray-200 py-2 mb-2">
+                                <Text className="w-12 text-md font-bold text-black">S. No.</Text>
+                                <Text className="w-32 text-md font-bold text-black">Timings</Text>
+                                <Text className="w-24 text-md font-bold text-black">Dosage</Text>
+                                <Text className="w-40 text-md font-bold text-black">Duration</Text>
+                                <Text className="flex-1 text-md font-bold text-black">Type</Text>
+                                <View className="w-24" />
                             </View>
-                        )}
-                    </ScrollView>
-                </View>
-            </SafeAreaView>
 
-            {/* Nested Detail Modal for Adding/Editing Variants */}
+                            <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
+                                {variants.map((v, index) => (
+                                    <View key={v.id} className="flex-row items-center py-3 border-b border-gray-50">
+                                        <Text className="w-12 text-md text-black pl-2">{index + 1}</Text>
+                                        <Text className="w-32 text-md text-black font-medium">{v.timings}</Text>
+                                        <Text className="w-24 text-md text-black">{v.dosage || 'N/A'}</Text>
+                                        <Text className="w-40 text-md text-black" numberOfLines={1}>
+                                            {v.duration && /^\d+$/.test(v.duration.trim()) ? `${v.duration} Days` : (v.duration || 'N/A')}
+                                        </Text>
+                                        <Text className="flex-1 text-md text-black">{v.type || 'N/A'}</Text>
+
+                                        <View className="flex-row items-center w-24 justify-end gap-3 px-2">
+                                            <TouchableOpacity onPress={() => handleEditVariant(v)}>
+                                                <Icon icon={PRESCRIPTION_MODAL_ICONS.editCircle} size={26} color="#007AFF" />
+                                            </TouchableOpacity>
+                                            <TouchableOpacity onPress={() => onApplyVariant(v, brandName, genericName)}>
+                                                <Icon icon={PRESCRIPTION_MODAL_ICONS.checkmarkCircle} size={26} color="#007AFF" />
+                                            </TouchableOpacity>
+                                        </View>
+                                    </View>
+                                ))}
+                                {variants.length === 0 && (
+                                    <View className="py-20 items-center justify-center">
+                                        <Text className="text-gray-400 italic text-base">No variants found</Text>
+                                    </View>
+                                )}
+                            </ScrollView>
+                        </View>
+                    </View>
+                </View>
+            </View>
+
             <PrescriptionEditModal
                 visible={isEditModalVisible}
                 onClose={() => setIsEditModalVisible(false)}
@@ -200,7 +188,7 @@ export default function PrescriptionModal({
                 initialData={{
                     brandName,
                     genericName,
-                    variants: editingVariant ? [editingVariant] : [] // Pass single variant to edit or empty
+                    variants: editingVariant ? [editingVariant] : []
                 }}
             />
         </Modal>

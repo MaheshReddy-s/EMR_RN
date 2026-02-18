@@ -53,6 +53,7 @@ export interface PrescriptionPayload {
         dosage: string;
         duration: string;
         type?: string;
+        instructions?: string;
     }>;
 }
 
@@ -67,7 +68,10 @@ export interface ConsultationItem {
     drawings?: StrokeData[];
     dosage?: string;
     duration?: string;
+    instructions?: string;
+    timings?: string;
     height?: number;
+    type?: string;
 }
 
 /** API-level consultation item (used by consultation-service for submission) */

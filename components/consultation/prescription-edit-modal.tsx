@@ -43,16 +43,16 @@ export default function PrescriptionEditModal({
     // Basic Info
     const [brandName, setBrandName] = useState('');
     const [genericName, setGenericName] = useState('');
-    const [type, setType] = useState('Tablet');
+    const [type, setType] = useState('');
     const [showTypePicker, setShowTypePicker] = useState(false);
     const [selectedFrequency, setSelectedFrequency] = useState('');
 
     // Quantity & Units
     const [quantity, setQuantity] = useState('');
-    const [selectedUnit, setSelectedUnit] = useState('mg');
+    const [selectedUnit, setSelectedUnit] = useState('');
 
     // Duration
-    const [selectedDuration, setSelectedDuration] = useState('5');
+    const [selectedDuration, setSelectedDuration] = useState('');
     const [isCustomDuration, setIsCustomDuration] = useState(false);
     const [customDurationValue, setCustomDurationValue] = useState('');
 
@@ -70,11 +70,11 @@ export default function PrescriptionEditModal({
 
 
     // Purchase Quantity
-    const [purchaseCount, setPurchaseCount] = useState('1');
+    const [purchaseCount, setPurchaseCount] = useState('');
     const [isPurchaseNA, setIsPurchaseNA] = useState(false);
 
     // Instructions
-    const [selectedInstruction, setSelectedInstruction] = useState('After Food');
+    const [selectedInstruction, setSelectedInstruction] = useState('');
     const [customInstructions, setCustomInstructions] = useState('');
 
     useEffect(() => {
@@ -84,7 +84,7 @@ export default function PrescriptionEditModal({
 
             const variant = initialData.variants?.[0];
             if (variant) {
-                setType(variant.type || 'Tablet');
+                setType(variant.type || '');
 
                 // Parse Dosage
                 const dosageParts = (variant.dosage || '').split(' ');
@@ -94,10 +94,11 @@ export default function PrescriptionEditModal({
                     if (UNITS.includes(potentialUnit)) {
                         setSelectedUnit(potentialUnit);
                     } else {
-                        setSelectedUnit('mg');
+                        setSelectedUnit('');
                     }
                 } else {
                     setQuantity(variant.dosage || '');
+                    setSelectedUnit('');
                 }
 
                 // Parse Duration
@@ -114,14 +115,27 @@ export default function PrescriptionEditModal({
                     setCustomDurationValue(durationVal);
                 }
 
-                // Parse Timings
+                // Parse Timings (Handle: M-A-E-N, 1-0-1-0, or ------N)
                 if (variant.timings) {
-                    const timings = variant.timings.split('-');
-                    if (timings.length === 4) {
-                        setMorning(timings[0]);
-                        setAfternoon(timings[1]);
-                        setEvening(timings[2]);
-                        setNight(timings[3]);
+                    const t = variant.timings.toUpperCase();
+                    if (t.includes('-') && t.split('-').length === 4) {
+                        // Old 1-0-1-0 or M-A-E-N format with dashes
+                        const parts = t.split('-');
+                        const normalizePart = (v: string, letter: string) => {
+                            const val = v.trim();
+                            if (val === letter || val === '1') return '1';
+                            return '0';
+                        };
+                        setMorning(normalizePart(parts[0], 'M'));
+                        setAfternoon(normalizePart(parts[1], 'A'));
+                        setEvening(normalizePart(parts[2], 'E'));
+                        setNight(normalizePart(parts[3], 'N'));
+                    } else {
+                        // New compact format (e.g., ------N or MAEN)
+                        setMorning(t.includes('M') || (t.startsWith('1') && !t.includes('-')) ? '1' : '0');
+                        setAfternoon(t.includes('A') ? '1' : '0');
+                        setEvening(t.includes('E') ? '1' : '0');
+                        setNight(t.includes('N') ? '1' : '0');
                     }
                 } else {
                     setMorning('');
@@ -235,19 +249,32 @@ export default function PrescriptionEditModal({
         let finalDuration = '';
         if (isCustomDuration) {
             finalDuration = customDurationValue || 'Custom';
+            if (/^\d+$/.test(finalDuration)) finalDuration += ' Days';
         } else {
             finalDuration = selectedDuration === 'Until further instructions' ? 'Until further instructions' : `${selectedDuration} Days`;
         }
 
         const finalDosage = quantity ? `${quantity} ${selectedUnit}` : selectedUnit;
-        const finalTimings = `${morning}-${afternoon}-${evening}-${night}`;
+        const finalTimings = [
+            { val: morning, letter: 'M' },
+            { val: afternoon, letter: 'A' },
+            { val: evening, letter: 'E' },
+            { val: night, letter: 'N' }
+        ].map(t => {
+            const v = t.val.trim().toUpperCase();
+            if (t.letter && (v === '1' || v === t.letter)) return t.letter;
+            if (v === '1') return '1'; // Handle non-letter slots if ever used
+            if (v === 'TR' || v === 'T') return 'TR'; // Example specific code if needed, keeping simple matching for now
+            // Just return '-' for blanks/zeros
+            return '-';
+        }).join('-');
         // NOTE: We are currently NOT saving the "Details" (row 2) into the simple timing string 
         // to preserve backward compatibility with the 'timings' string format "1-0-0-1".
         // If the backend/type supports it, we could append it.
 
         let finalInstructions = selectedInstruction;
         if (customInstructions) {
-            finalInstructions = finalInstructions ? `${finalInstructions}. ${customInstructions}` : customInstructions;
+            finalInstructions = finalInstructions ? `${finalInstructions}, ${customInstructions}` : customInstructions;
         }
 
         const variant: PrescriptionVariant = {
@@ -277,7 +304,7 @@ export default function PrescriptionEditModal({
             <View className="flex-1 bg-black/50 justify-center items-center px-4 py-8">
                 <KeyboardAvoidingView
                     behavior={Platform.OS === "ios" ? "padding" : "height"}
-                    className="w-full max-w-4xl bg-white rounded-2xl overflow-hidden shadow-2xl flex-1 max-h-[95%]"
+                    className="w-full max-w-3xl bg-white rounded-2xl overflow-hidden shadow-2xl flex-1 max-h-[95%]"
                 >
                     {/* Header */}
                     <View className="h-14 bg-white border-b border-gray-100 flex-row items-center justify-between px-4">

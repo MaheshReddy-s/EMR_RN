@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Platform, View, Text } from 'react-native';
 
 interface PdfViewerProps {
@@ -12,6 +12,27 @@ interface PdfViewerProps {
  * - Native (iOS/Android): Uses react-native-webview with specific configuration for PDFs.
  */
 export default function PdfViewer({ uri, title = 'Document' }: PdfViewerProps) {
+    const [sourceUri, setSourceUri] = useState(uri);
+
+    useEffect(() => {
+        if (Platform.OS === 'android' && uri.startsWith('file://')) {
+            const loadAndroidPdf = async () => {
+                try {
+                    const FileSystem = require('expo-file-system/legacy');
+                    const base64 = await FileSystem.readAsStringAsync(uri, {
+                        encoding: 'base64',
+                    });
+                    setSourceUri(`data:application/pdf;base64,${base64}`);
+                } catch (e) {
+                    console.error('Failed to prepare Android PDF:', e);
+                }
+            };
+            loadAndroidPdf();
+        } else {
+            setSourceUri(uri);
+        }
+    }, [uri]);
+
     if (Platform.OS === 'web') {
         return (
             <View style={{ flex: 1 }}>
@@ -34,14 +55,13 @@ export default function PdfViewer({ uri, title = 'Document' }: PdfViewerProps) {
         const WebView = require('react-native-webview').default;
 
         // On iOS, WKWebView handles PDFs natively. 
-        // We need to ensure local file access is allowed.
+        // On Android, we use a data URI for local files to work around WebView limitations.
         return (
             <View style={{ flex: 1, backgroundColor: 'white' }}>
                 <WebView
-                    source={{ uri }}
+                    source={{ uri: sourceUri }}
                     style={{ flex: 1 }}
                     startInLoadingState
-                    // Essential for local PDF files on iOS/Android
                     originWhitelist={['*']}
                     allowFileAccess={true}
                     allowFileAccessFromFileURLs={true}
@@ -49,6 +69,9 @@ export default function PdfViewer({ uri, title = 'Document' }: PdfViewerProps) {
                     scalesPageToFit={true}
                     bounces={false}
                     scrollEnabled={true}
+                    // Improve Android rendering
+                    androidLayerType="hardware"
+                    mixedContentMode="always"
                 />
             </View>
         );

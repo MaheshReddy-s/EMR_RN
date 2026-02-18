@@ -73,27 +73,34 @@ export function useConsultationPatientData({
         }
     }, []);
 
+    const [latestConsultation, setLatestConsultation] = useState<any | null>(null);
+
     useEffect(() => {
         if (!patientId) return;
         setIsLoadingPatient(true);
         setPatientError(null);
         let cancelled = false;
 
-        const fetchPatient = async () => {
+        const fetchData = async () => {
             try {
-                const data = await PatientRepository.getPatientDetails(patientId);
+                const [details, recent] = await Promise.all([
+                    PatientRepository.getPatientDetails(patientId),
+                    PatientRepository.getRecentConsultation(patientId),
+                ]);
+
                 if (cancelled) return;
-                setPatient(data);
+                setPatient(details);
+                setLatestConsultation(recent);
             } catch (error) {
                 if (cancelled) return;
-                if (__DEV__) console.error('Error fetching patient details:', error);
-                setPatientError('Failed to load patient details.');
+                if (__DEV__) console.error('Error fetching patient data:', error);
+                setPatientError('Failed to load patient data.');
             } finally {
                 if (!cancelled) setIsLoadingPatient(false);
             }
         };
 
-        fetchPatient();
+        fetchData();
         return () => { cancelled = true; };
     }, [patientId]);
 
@@ -185,5 +192,6 @@ export function useConsultationPatientData({
         patientLabs,
         isLoadingAssets,
         handleCapturePhoto,
+        latestConsultation,
     };
 }

@@ -15,6 +15,7 @@ import ConsultationTabs from '@/components/consultation/consultation-tabs';
 import DrawingCanvas from '@/components/consultation/drawing-canvas';
 import FollowUpModal from '@/components/consultation/follow-up-modal';
 import PrescriptionModal, { PrescriptionData } from '@/components/consultation/prescription-modal';
+import PrescriptionEditModal from '@/components/consultation/prescription-edit-modal';
 import PrintPreviewModal from '@/components/consultation/print-preview-modal';
 import type { FollowupInfoSelection } from '@/components/consultation/followup-info-modal';
 import { VisitHistoryModal } from '@/components/patient/VisitHistoryModal';
@@ -81,6 +82,7 @@ interface ConsultationScreenContentProps {
 
     clearSection: (section: TabType) => void;
     removeItem: (section: TabType, id: string) => void;
+    onClearRow: (section: TabType, id: string) => void;
     onExpandRow: (section: TabType, id: string) => void;
     onStrokesChange: (section: TabType, id: string, strokes: any[]) => void;
     onEditRow: (section: TabType, item: ConsultationItem) => void;
@@ -121,6 +123,9 @@ interface ConsultationScreenContentProps {
     editModalText: string;
     setEditModalText: (text: string) => void;
     onSaveEditModal: () => void;
+    isPrescriptionEditModalVisible: boolean;
+    setIsPrescriptionEditModalVisible: (visible: boolean) => void;
+    onSavePrescriptionEdit: (data: PrescriptionData) => void;
 }
 
 export function ConsultationScreenContent(props: ConsultationScreenContentProps) {
@@ -161,7 +166,7 @@ export function ConsultationScreenContent(props: ConsultationScreenContentProps)
                         index={index}
                         prescription={{
                             ...item,
-                            height: item.height || 32,
+                            height: item.height,
                         }}
                         onExpand={() => props.onExpandRow(sectionKey, item.id)}
                         onDelete={() => props.removeItem(sectionKey, item.id)}
@@ -172,7 +177,8 @@ export function ConsultationScreenContent(props: ConsultationScreenContentProps)
                         isErasing={false}
                         onDrawingActive={props.onDrawingActive}
                         onEdit={() => props.onEditRow(sectionKey, item)}
-                        showIndex={false}
+                        onClear={() => props.onClearRow(sectionKey, item.id)}
+                        showIndex={sectionKey === 'prescriptions'}
                         isFullWidth={sectionKey !== 'prescriptions'}
                     />
                 ))}
@@ -182,12 +188,7 @@ export function ConsultationScreenContent(props: ConsultationScreenContentProps)
 
     return (
         <View className="flex-1 bg-white" style={props.isWeb ? { alignItems: 'center' } : { flex: 1, width: '100%' }}>
-            {props.isLoadingPatient ? (
-                <View className="absolute inset-0 z-50 bg-white justify-center items-center">
-                    <ActivityIndicator size="large" color="#1a365d" />
-                    <Text className="mt-4 text-gray-500 font-medium font-sans">Loading Patient Records...</Text>
-                </View>
-            ) : props.patientError ? (
+            {props.patientError ? (
                 <View className="absolute inset-0 z-50 bg-white justify-center items-center px-6">
                     <Icon icon={DASHBOARD_ICONS.cancel} size={48} color="#FF3B30" />
                     <Text className="text-xl font-bold text-gray-800 mt-4 mb-2">Something went wrong</Text>
@@ -346,19 +347,27 @@ export function ConsultationScreenContent(props: ConsultationScreenContentProps)
                 <PrescriptionModal
                     visible={props.isPrescriptionModalVisible}
                     onClose={() => props.setIsPrescriptionModalVisible(false)}
-                    onSave={(data) => {
+                    onApplyVariant={(variant, brandName, genericName) => {
                         const id = Date.now().toString();
-                        const primaryVariant = data.variants[0];
                         const newItem: ConsultationItem = {
                             id,
-                            name: data.brandName,
-                            genericName: data.genericName,
-                            dosage: primaryVariant?.timings || 'M-O-E-N',
-                            duration: primaryVariant?.duration || '90 Days',
+                            name: brandName,
+                            genericName: genericName,
+                            dosage: variant.dosage || 'N/A',
+                            duration: variant.duration || '90 Days',
+                            instructions: variant.instructions || '',
+                            timings: variant.timings || '',
                         };
                         props.addItem('prescriptions', newItem);
                         props.setIsPrescriptionModalVisible(false);
                     }}
+                    initialData={props.currentPrescriptionData || undefined}
+                />
+
+                <PrescriptionEditModal
+                    visible={props.isPrescriptionEditModalVisible}
+                    onClose={() => props.setIsPrescriptionEditModalVisible(false)}
+                    onSave={props.onSavePrescriptionEdit}
                     initialData={props.currentPrescriptionData || undefined}
                 />
 

@@ -18,6 +18,7 @@ type Action =
     | { type: 'UPDATE_ITEM'; section: TabType; id: string; changes: Partial<ConsultationItem> }
     | { type: 'SET_STROKES'; section: TabType; id: string; strokes: StrokeData[] }
     | { type: 'CLEAR_SECTION'; section: TabType }
+    | { type: 'CLEAR_ITEM_DRAWINGS'; section: TabType; id: string }
     | { type: 'UPDATE_TIMER'; time: string }
     | { type: 'RESET_SESSION' }
     | { type: 'RESTORE_DRAFT'; draft: Partial<ConsultationState> };
@@ -88,6 +89,13 @@ function consultationReducer(state: ConsultationState, action: Action): Consulta
         }
         case 'CLEAR_SECTION':
             return { ...state, [action.section]: [] };
+        case 'CLEAR_ITEM_DRAWINGS':
+            return {
+                ...state,
+                [action.section]: (state[action.section] as ConsultationItem[]).map(i =>
+                    i.id === action.id ? { ...i, drawings: [], height: undefined } : i
+                )
+            };
         case 'UPDATE_TIMER':
             return { ...state, elapsedTime: action.time };
         case 'RESET_SESSION':
@@ -167,6 +175,9 @@ export function useConsultation() {
     const clearSection = useCallback((section: TabType) =>
         dispatch({ type: 'CLEAR_SECTION', section }), []);
 
+    const clearItemDrawings = useCallback((section: TabType, id: string) =>
+        dispatch({ type: 'CLEAR_ITEM_DRAWINGS', section, id }), []);
+
     const restoreDraft = useCallback((draft: Partial<ConsultationState>) =>
         dispatch({ type: 'RESTORE_DRAFT', draft }), []);
 
@@ -177,6 +188,7 @@ export function useConsultation() {
         updateItem,
         setStrokes,
         clearSection,
+        clearItemDrawings,
         restoreDraft
     };
 }

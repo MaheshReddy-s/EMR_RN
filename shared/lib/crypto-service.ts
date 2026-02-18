@@ -93,6 +93,18 @@ function bytesToUtf8(bytes: Uint8Array): string {
     return output;
 }
 
+/**
+ * Convert Uint8Array to base64 string.
+ */
+export function bytesToBase64(bytes: Uint8Array): string {
+    const CHUNK_SIZE = 0x8000;
+    let binary = '';
+    for (let i = 0; i < bytes.length; i += CHUNK_SIZE) {
+        binary += String.fromCharCode.apply(null, bytes.subarray(i, i + CHUNK_SIZE) as any);
+    }
+    return btoa(binary);
+}
+
 // ─── Public API ──────────────────────────────────────────────
 
 /**
@@ -276,4 +288,45 @@ export async function decryptAssetUrl(
         file.write(result.bytes);
         return file.uri;
     }
+}
+
+/**
+ * Encrypt raw bytes using AES-GCM.
+ */
+export async function encryptAesGcm(
+    bytes: Uint8Array,
+    masterKeyBytes: Uint8Array
+): Promise<Uint8Array> {
+    const iv = Platform.OS === 'web' && window.crypto?.getRandomValues
+        ? window.crypto.getRandomValues(new Uint8Array(12))
+        : require('expo-crypto').getRandomBytes(12);
+
+    if (Platform.OS !== 'web' || !window.crypto?.subtle) {
+        const aes = gcm(masterKeyBytes, iv);
+        const ciphertext = aes.encrypt(bytes);
+        const combined = new Uint8Array(iv.length + ciphertext.length);
+        combined.set(iv);
+        combined.set(ciphertext, iv.length);
+        return combined;
+    }
+
+    const cryptoKey = await window.crypto.subtle.importKey(
+        'raw',
+        masterKeyBytes.buffer as ArrayBuffer,
+        { name: 'AES-GCM' },
+        false,
+        ['encrypt']
+    );
+
+    const ciphertextBuffer = await window.crypto.subtle.encrypt(
+        { name: 'AES-GCM', iv },
+        cryptoKey,
+        bytes.buffer as ArrayBuffer
+    );
+
+    const ciphertext = new Uint8Array(ciphertextBuffer);
+    const combined = new Uint8Array(iv.length + ciphertext.length);
+    combined.set(iv);
+    combined.set(ciphertext, iv.length);
+    return combined;
 }
