@@ -289,9 +289,10 @@ export function useDashboard() {
                 id: appointment.patientId,
                 patientName: appointment.patientName,
                 patientMobile: appointment.patientMobile || '',
+                appointmentDate: selectedDate.toISOString(),
             },
         });
-    }, []);
+    }, [selectedDate]);
 
     const handlePatientPress = useCallback((patient: Patient) => {
         router.push({

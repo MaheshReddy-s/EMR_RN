@@ -24,8 +24,23 @@ export default function PatientSummaryScreen() {
         patientMobile?: string;
         patientAge?: string;
         patientGender?: string;
+        appointmentDate?: string;
     }>();
     const patientId = firstParam(params.id);
+
+    const isPastAppointment = useMemo(() => {
+        const dateStr = firstParam(params.appointmentDate);
+        if (!dateStr) return false;
+        try {
+            const date = new Date(dateStr);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            date.setHours(0, 0, 0, 0);
+            return date < today;
+        } catch {
+            return false;
+        }
+    }, [params.appointmentDate]);
 
     const initialPatient = useMemo<Patient | null>(() => {
         if (!patientId) return null;
@@ -104,7 +119,7 @@ export default function PatientSummaryScreen() {
                             <PatientProfileBlock
                                 patient={patient}
                                 onEditProfile={openEditProfile}
-                                onStartConsultation={handleStartConsultation}
+                                onStartConsultation={isPastAppointment ? undefined : handleStartConsultation}
                             />
 
                             <PatientSummarySection summary={summary} />
@@ -121,7 +136,7 @@ export default function PatientSummaryScreen() {
                             <PatientProfileBlock
                                 patient={patient}
                                 onEditProfile={openEditProfile}
-                                onStartConsultation={handleStartConsultation}
+                                onStartConsultation={isPastAppointment ? undefined : handleStartConsultation}
                             />
 
                             <PatientSummarySection summary={summary} />

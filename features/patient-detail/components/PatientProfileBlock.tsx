@@ -7,7 +7,7 @@ import { Icon } from '@/components/ui/Icon';
 interface PatientProfileBlockProps {
     patient: Patient;
     onEditProfile: () => void;
-    onStartConsultation: () => void;
+    onStartConsultation?: () => void;
 }
 
 const PatientProfileBlock = ({
@@ -72,13 +72,15 @@ const PatientProfileBlock = ({
                     <Text className="text-[#007AFF] font-medium" style={{ fontSize: isWeb ? 14 : 15 }}>Edit Profile</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity
-                    onPress={onStartConsultation}
-                    className="bg-blue-500 rounded-full"
-                    style={{ paddingHorizontal: isWeb ? 16 : 24, paddingVertical: isWeb ? 6 : 10 }}
-                >
-                    <Text className="text-white font-medium" style={{ fontSize: isWeb ? 14 : 15 }}>Start Consultation</Text>
-                </TouchableOpacity>
+                {onStartConsultation && (
+                    <TouchableOpacity
+                        onPress={onStartConsultation}
+                        className="bg-blue-500 rounded-full"
+                        style={{ paddingHorizontal: isWeb ? 16 : 24, paddingVertical: isWeb ? 6 : 10 }}
+                    >
+                        <Text className="text-white font-medium" style={{ fontSize: isWeb ? 14 : 15 }}>Start Consultation</Text>
+                    </TouchableOpacity>
+                )}
             </View>
         </View>
     );
