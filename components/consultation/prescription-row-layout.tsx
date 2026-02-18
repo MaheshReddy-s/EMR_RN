@@ -56,51 +56,113 @@ export default function PrescriptionRowLayout({
             <View className="flex-1 relative">
                 {/* Text Layer - Relative on web for visibility, Absolute on app for drawing */}
                 <View
-                    className={Platform.OS === 'web' ? "px-2 pt-[5.6px] pb-[5.6px] z-20" : "absolute top-0 left-0 right-0 px-2 pt-[5.6px] pb-[5.6px] z-20"}
+                    className={Platform.OS === 'web' ? "px-4 pt-1 z-20" : "absolute top-0 left-0 right-0 z-20"}
                     pointerEvents={Platform.OS === 'web' ? "auto" : "none"}
+                    style={{ height: '100%' }}
                 >
-                    <View className="flex-row items-start">
+                    {/* Row 1: Exact coordinates from POC for prescriptions, Different style for other sections */}
+                    <View style={{ height: isFullWidth ? 'auto' : 25, position: 'relative', minHeight: 22 }}>
                         {showIndex && (
-                            <Text className="text-[13.5px] font-semibold text-gray-500 mr-1 mt-[1px]">
+                            <Text
+                                style={{
+                                    position: 'absolute', left: 10, top: 1, width: 25,
+                                    fontSize: 13.5, fontWeight: '600', color: '#6c757d'
+                                }}
+                            >
                                 {index + 1}.
                             </Text>
                         )}
-                        <View className="flex-1">
-                            <Text
-                                className="text-gray-900 font-bold"
-                                style={[{ fontSize: 13.5 }, isFullWidth && { fontWeight: 'normal', fontSize: 13 }]}
-                                numberOfLines={2}
-                            >
-                                {prescription?.name}
-                            </Text>
-                        </View>
+                        <Text
+                            style={{
+                                position: isFullWidth ? 'relative' : 'absolute',
+                                left: showIndex ? 28 : 10,
+                                top: 1,
+                                width: isFullWidth ? '95%' : (showIndex ? 235 : 260),
+                                fontSize: 13.5,
+                                fontWeight: isFullWidth ? 'normal' : 'bold',
+                                color: isFullWidth ? '#495057' : '#212529',
+                                textTransform: isFullWidth ? 'none' : 'uppercase'
+                            }}
+                            numberOfLines={isFullWidth ? 2 : 1}
+                        >
+                            {prescription?.name}
+                        </Text>
 
-                        {Platform.OS !== 'web' && !isFullWidth && (
-                            <View className="flex-row items-start justify-end ml-2" style={{ width: '45%' }}>
+                        {!isFullWidth && (
+                            <>
                                 <Text
-                                    className="text-gray-700 font-bold text-right flex-1"
-                                    style={{ fontSize: 13.5 }}
-                                    numberOfLines={1}
+                                    style={{
+                                        position: 'absolute', left: 310, top: 1, width: 240,
+                                        fontSize: 13.5, fontWeight: 'bold', color: '#495057'
+                                    }}
                                 >
-                                    {prescription?.dosage}
+                                    {prescription?.timings || ''}
                                 </Text>
                                 <Text
-                                    className="text-gray-900 font-bold text-right ml-2"
-                                    style={{ fontSize: 13.2, minWidth: 60 }}
+                                    style={{
+                                        position: 'absolute', right: 10, top: 1,
+                                        fontSize: 13.2, fontWeight: 'bold', textAlign: 'right', color: '#000'
+                                    }}
                                     numberOfLines={1}
                                 >
-                                    {prescription?.duration}
+                                    {prescription?.duration && /^\d+$/.test(prescription.duration.trim())
+                                        ? `${prescription.duration} Days`
+                                        : prescription?.duration}
                                 </Text>
-                            </View>
+                            </>
                         )}
                     </View>
 
-                    {Platform.OS === 'web' && !isFullWidth && (
-                        <View className="flex-row mt-1">
-                            <Text className="text-gray-700 font-bold text-[13px] mr-2">{prescription?.dosage}</Text>
-                            <Text className="text-gray-900 font-bold text-[13px]">{prescription?.duration}</Text>
-                        </View>
-                    )}
+                    {/* Row 2: Dosage/Instructions for prescriptions, Notes for other sections */}
+                    {(() => {
+                        if (isFullWidth) {
+                            if (!prescription?.notes) return null;
+                            return (
+                                <View style={{ paddingLeft: 10, paddingRight: 10, marginTop: 0 }}>
+                                    <Text
+                                        style={{
+                                            fontSize: 14,
+                                            color: '#6c757d',
+                                            lineHeight: 18
+                                        }}
+                                        numberOfLines={0} // No limit for notes in other sections
+                                    >
+                                        {prescription.notes}
+                                    </Text>
+                                </View>
+                            );
+                        }
+
+                        const hasDosage = !!(prescription?.dosage && prescription?.dosage !== 'N/A' && !prescription?.dosage.includes('-'));
+                        const hasInstructions = !!prescription?.instructions;
+
+                        if (hasDosage || hasInstructions) {
+                            return (
+                                <View style={{ height: 20, position: 'relative', marginTop: 1 }}>
+                                    <Text
+                                        style={{
+                                            position: 'absolute', left: 10, width: 280,
+                                            fontSize: 13.5, color: '#000'
+                                        }}
+                                        numberOfLines={1}
+                                    >
+                                        {hasDosage ? prescription.dosage : ''}
+                                    </Text>
+                                    <Text
+                                        style={{
+                                            position: 'absolute', left: 310, width: 400,
+                                            fontSize: 13.5, color: '#000', fontStyle: 'italic',
+                                            textAlign: 'left'
+                                        }}
+                                        numberOfLines={1}
+                                    >
+                                        {prescription?.instructions || ''}
+                                    </Text>
+                                </View>
+                            );
+                        }
+                        return null;
+                    })()}
                 </View>
 
                 {/* Canvas Overlay - Hidden on web */}

@@ -241,7 +241,7 @@ export function useDashboard() {
         const requestId = ++searchRequestIdRef.current;
         setSearchQuery(text);
         if (!text.trim()) {
-            setSearchedPatients(null);
+            setSearchedPatients(null); // Clear search results immediately
             return;
         }
         if (!doctorId) return;
@@ -390,10 +390,8 @@ export function useDashboard() {
     }, []);
 
     const clearPatientsSearch = useCallback(() => {
-        searchRequestIdRef.current += 1;
-        setSearchQuery('');
-        setSearchedPatients(null);
-    }, []);
+        handlePatientSearch('');
+    }, [handlePatientSearch]);
 
     const shouldShowFab = useMemo(() => {
         if (activeTab !== 'appointments') return false;

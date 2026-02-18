@@ -9,10 +9,12 @@ import { useConsultationPatientData } from '@/features/consultation/hooks/useCon
 import { ConsultationSuggestion, useConsultationSuggestions } from '@/features/consultation/hooks/useConsultationSuggestions';
 import { useConsultationSubmit } from '@/features/consultation/hooks/useConsultationSubmit';
 import { ConsultationItem, StrokeData } from '@/entities';
-import { useConsultation, TabType } from '@/hooks/useConsultation';
+import { useConsultation, TabType, SECTION_KEYS } from '@/hooks/useConsultation';
 import { ConsultationRepository, MasterDataRepository } from '@/repositories';
 import { DraftService } from '@/services/draft-service';
 import { PdfService, PdfSection } from '@/services/pdf-service';
+import { mapToConsultationState } from '@/shared/lib/consultation-mapper';
+import type { PrescriptionData } from '@/entities/consultation/types';
 
 const DEFAULT_PDF_SECTION_IDS = ['complaints', 'diagnosis', 'examination', 'investigation', 'procedure', 'prescriptions', 'instruction', 'notes'];
 const SECTION_LABELS: Record<TabType, string> = {
@@ -45,7 +47,10 @@ export default function ConsultationScreen() {
     const isWeb = Platform.OS === 'web';
     const [isDrawingActive, setIsDrawingActive] = useState(false);
     const scrollViewRef = useRef<ScrollView>(null);
-    const { state: consultation, addItem, removeItem, updateItem, setStrokes, clearSection, restoreDraft } = useConsultation();
+    const {
+        state: consultation, addItem, removeItem, updateItem,
+        setStrokes, clearSection, clearItemDrawings, restoreDraft
+    } = useConsultation();
     const { complaints, diagnosis: diagnoses, examination: examinations, investigation: investigations, procedure: procedures, prescriptions, instruction: instructions, notes, elapsedTime } = consultation;
     const [currentInputStrokes, setCurrentInputStrokes] = useState<StrokeData[]>([]);
     const [activeTab, setActiveTab] = useState<TabType>('instruction');
@@ -55,6 +60,7 @@ export default function ConsultationScreen() {
     const [editModalText, setEditModalText] = useState('');
     const [editingItem, setEditingItem] = useState<{ section: TabType; id: string } | null>(null);
     const [isPrescriptionModalVisible, setIsPrescriptionModalVisible] = useState(false);
+    const [isPrescriptionEditModalVisible, setIsPrescriptionEditModalVisible] = useState(false);
     const [isEditProfileVisible, setIsEditProfileVisible] = useState(false);
     const [isHistoryVisible, setIsHistoryVisible] = useState(false);
     const [isPhotosVisible, setIsPhotosVisible] = useState(false);
@@ -67,7 +73,11 @@ export default function ConsultationScreen() {
     const [followUpDate, setFollowUpDate] = useState<Date | null>(null);
     const [editingPropertySuggestion, setEditingPropertySuggestion] = useState<ConsultationSuggestion | null>(null);
 
-    const { patient, setPatient, isLoadingPatient, patientError, user, patientPhotos, patientLabs, isLoadingAssets, handleCapturePhoto } = useConsultationPatientData({
+    const {
+        patient, setPatient, isLoadingPatient, patientError, user,
+        patientPhotos, patientLabs, isLoadingAssets, handleCapturePhoto,
+        latestConsultation
+    } = useConsultationPatientData({
         patientId,
         isPhotosVisible,
         isLabsVisible,
@@ -75,7 +85,31 @@ export default function ConsultationScreen() {
 
     useConsultationDraft({ patientId, consultation, restoreDraft });
 
-    const { suggestions, isLoadingSuggestions, onSuggestionSelect, refreshSuggestions } = useConsultationSuggestions({
+    const hasInitializedRef = useRef(false);
+
+    // Pre-fill from latest history if no draft was restored and state is empty
+    React.useEffect(() => {
+        if (!isLoadingPatient && latestConsultation && patientId && !hasInitializedRef.current) {
+            hasInitializedRef.current = true;
+            // Check if a draft exists first
+            DraftService.loadDraft(patientId).then((draft) => {
+                if (draft) return;
+
+                // Check if current consultation is empty
+                const isEmpty = SECTION_KEYS.every(key => (consultation[key] as any[]).length === 0);
+
+                if (isEmpty) {
+                    if (__DEV__) console.log('[Consultation] Pre-filling from latest history');
+                    const historyState = mapToConsultationState(latestConsultation);
+                    if (Object.keys(historyState).length > 0) {
+                        restoreDraft(historyState);
+                    }
+                }
+            });
+        }
+    }, [isLoadingPatient, latestConsultation, patientId, restoreDraft]);
+
+    const { suggestions, isLoadingSuggestions, onSuggestionSelect,refreshSuggestions } = useConsultationSuggestions({
         activeTab,
         writingText,
         consultation,
@@ -130,39 +164,31 @@ export default function ConsultationScreen() {
         setIsPrintPreviewVisible(true);
     };
 
-    const addToCurrentSection = async () => {
-        const textToSave = writingText.trim();
-        if (!textToSave && currentInputStrokes.length === 0) return;
+    const addToCurrentSection = () => {
+        const text = writingText.trim();
+        if (!text && currentInputStrokes.length === 0) return;
 
-        // 1. Add to current visit
-        onSuggestionSelect({
-            id: Date.now().toString(),
-            label: textToSave,
-            drawings: currentInputStrokes
-        } as ConsultationSuggestion);
-
-        // 2. Ask to save as master property (except prescriptions)
-        if (textToSave && activeTab !== 'prescriptions') {
-            Alert.alert(
-                'Save Property',
-                `Would you like to save "${textToSave}" to your master list of ${SECTION_LABELS[activeTab]}?`,
-                [
-                    { text: 'No', style: 'cancel' },
-                    {
-                        text: 'Yes, Save',
-                        onPress: async () => {
-                            try {
-                                await MasterDataRepository.addItem(activeTab as any, textToSave);
-                                await refreshSuggestions();
-                            } catch (error) {
-                                Alert.alert('Error', 'Failed to save master property');
-                            }
-                        }
-                    }
-                ]
-            );
+        if (activeTab === 'prescriptions') {
+            setEditingItem(null);
+            setCurrentPrescriptionData({
+                brandName: text,
+                genericName: '',
+                variants: [{
+                    id: Date.now().toString(),
+                    timings: 'M-A-E-N',
+                    dosage: '',
+                    duration: '5 Days',
+                    type: 'Tablet',
+                    instructions: ''
+                }]
+            });
+            setIsPrescriptionEditModalVisible(true);
+            setWritingText('');
+            setCurrentInputStrokes([]);
+            return;
         }
 
+        onSuggestionSelect({ id: Date.now().toString(), label: text, drawings: currentInputStrokes } as ConsultationSuggestion);
         setWritingText('');
         setCurrentInputStrokes([]);
     };
@@ -179,13 +205,6 @@ export default function ConsultationScreen() {
         if (item) updateItem(section, id, { height: (item.height || 60) + 40 });
     };
 
-    const handleEditRow = (section: TabType, item: ConsultationItem) => {
-        setEditingItem({ section, id: item.id });
-        setEditingPropertySuggestion(null);
-        setEditModalTitle(`Edit ${SECTION_LABELS[section]}`);
-        setEditModalText(item.name);
-        setIsEditModalVisible(true);
-    };
 
     const handleClearAll = (section: TabType) => {
         Alert.alert('Clear All', `Are you sure you want to clear all items in ${SECTION_LABELS[section]}?`, [
@@ -194,12 +213,27 @@ export default function ConsultationScreen() {
         ]);
     };
 
-    const handleEditCurrentInput = () => {
-        setEditingItem(null);
-        setEditingPropertySuggestion(null);
-        setEditModalTitle(`Edit ${SECTION_LABELS[activeTab]}`);
-        setEditModalText(writingText);
-        setIsEditModalVisible(true);
+    const handleEditRow = (section: TabType, item: ConsultationItem) => {
+        setEditingItem({ section, id: item.id });
+        if (section === 'prescriptions') {
+            setCurrentPrescriptionData({
+                brandName: item.name,
+                genericName: item.genericName || '',
+                variants: [{
+                    id: item.id,
+                    timings: item.timings || '',
+                    dosage: item.dosage || '',
+                    duration: item.duration || '',
+                    instructions: item.instructions || '',
+                    type: (item as any).type || 'Tablet'
+                }]
+            });
+            setIsPrescriptionEditModalVisible(true);
+        } else {
+            setEditModalTitle(`Edit ${section}`);
+            setEditModalText(item.name);
+            setIsEditModalVisible(true);
+        }
     };
 
     const handleAddNewProperty = () => {
@@ -245,6 +279,14 @@ export default function ConsultationScreen() {
         );
     };
 
+    const handleEditCurrentInput = () => {
+        setEditingItem(null);
+        setEditModalTitle(`Edit ${activeTab}`);
+        setEditModalText(writingText);
+        setIsEditModalVisible(true);
+    };
+ 
+
     const saveEditModal = async () => {
         if (editingPropertySuggestion) {
             // Edit Master Property
@@ -272,6 +314,35 @@ export default function ConsultationScreen() {
             setWritingText(editModalText);
         }
         setIsEditModalVisible(false);
+    };
+
+    const savePrescriptionEdit = (data: PrescriptionData) => {
+        const v = data.variants[0];
+        if (editingItem && editingItem.section === 'prescriptions') {
+            updateItem('prescriptions', editingItem.id, {
+                name: data.brandName,
+                genericName: data.genericName,
+                dosage: v.dosage,
+                duration: v.duration,
+                instructions: v.instructions,
+                timings: v.timings,
+            });
+        } else {
+            // New Prescription Item
+            const newItem: ConsultationItem = {
+                id: Date.now().toString(),
+                name: data.brandName,
+                genericName: data.genericName,
+                dosage: v.dosage || '',
+                duration: v.duration || '5 Days',
+                instructions: v.instructions || '',
+                timings: v.timings || '',
+                type: v.type || 'Tablet',
+                drawings: [],
+            };
+            addItem('prescriptions', newItem);
+        }
+        setIsPrescriptionEditModalVisible(false);
     };
 
     return (
@@ -313,6 +384,7 @@ export default function ConsultationScreen() {
                 notes={notes}
                 clearSection={clearSection}
                 removeItem={removeItem}
+                onClearRow={clearItemDrawings}
                 onExpandRow={handleExpandRow}
                 onStrokesChange={handleStrokesChange}
                 onEditRow={handleEditRow}
@@ -348,6 +420,9 @@ export default function ConsultationScreen() {
                 editModalText={editModalText}
                 setEditModalText={setEditModalText}
                 onSaveEditModal={saveEditModal}
+                isPrescriptionEditModalVisible={isPrescriptionEditModalVisible}
+                setIsPrescriptionEditModalVisible={setIsPrescriptionEditModalVisible}
+                onSavePrescriptionEdit={savePrescriptionEdit}
                 onAddNewProperty={handleAddNewProperty}
                 onEditProperty={handleEditProperty}
                 onDeleteProperty={handleDeleteProperty}

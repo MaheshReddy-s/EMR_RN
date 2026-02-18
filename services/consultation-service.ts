@@ -133,14 +133,13 @@ export const ConsultationService = {
      * Fetch consultation suggestions (Properties) for a specific section
      */
     async getSuggestions(doctorId: string, section: ConsultationSection): Promise<SuggestionItem[]> {
-        const response = await api.get<Array<Record<string, unknown>>>(
-            API_ENDPOINTS.PROPERTIES.SECTION(doctorId, section)
-        );
+        const endpoint = API_ENDPOINTS.PROPERTIES.SECTION(doctorId, section);
+        const response = await api.get<Array<Record<string, unknown>>>(endpoint);
 
         const mapped = response.map((item) => ({
             id: (item._id as string) || (item.id as string) || Date.now().toString(),
             label: (item.property_value as string) || (item.name as string) || '',
-            frequency: (item.frequency as number) || 0,
+            frequency: (item.usage_frequency as number) || (item.frequency as number) || 0,
         })).filter((item) => item.label && item.label.trim().length > 0);
 
         // Sort by frequency descending, then alphabetically ascending
@@ -183,6 +182,65 @@ export const ConsultationService = {
      * Fetch the prescription list for a doctor
      */
     async getPrescriptions(doctorId: string): Promise<any[]> {
-        return api.get<any[]>(API_ENDPOINTS.PRESCRIPTIONS.LIST(doctorId));
+        const endpoint = API_ENDPOINTS.PRESCRIPTIONS.LIST(doctorId);
+        const response = await api.get<any[]>(endpoint);
+
+        // Sort by usage_frequency or frequency descending
+        return response.sort((a, b) => {
+            const freqA = (a.usage_frequency as number) || (a.frequency as number) || 0;
+            const freqB = (b.usage_frequency as number) || (b.frequency as number) || 0;
+            if (freqB !== freqA) {
+                return freqB - freqA;
+            }
+            return (a.brand_name || a.name || '').localeCompare(b.brand_name || b.name || '');
+        });
+    },
+
+    /**
+     * Create a new prescription or add a variant to an existing one.
+     */
+    async createPrescription(doctorId: string, payload: Record<string, any>): Promise<any[]> {
+        const endpoint = API_ENDPOINTS.PRESCRIPTIONS.CREATE(doctorId);
+        return api.post<any[]>(endpoint, payload);
+    },
+
+    /**
+     * Get specific prescription or variant details.
+     * Note: Uses POST as per spec (though atypical for retrieval).
+     */
+    async getPrescriptionDetails(doctorId: string, prescriptionId: string, variantId?: string): Promise<any> {
+        // We reuse the update endpoint pattern but check if there's a specific endpoint
+        // ENDPOINTS.PRESCRIPTIONS.UPDATE maps to `/${doctorId}/prescription/${id}`
+        // We will assume the base ID path is what's needed.
+        const endpoint = API_ENDPOINTS.PRESCRIPTIONS.UPDATE(doctorId, prescriptionId);
+        return api.post<any>(endpoint, { variant_id: variantId });
+    },
+
+    /**
+     * Update an existing prescription or variant.
+     */
+    async updatePrescription(doctorId: string, prescriptionId: string, payload: Record<string, any>): Promise<any[]> {
+        const endpoint = API_ENDPOINTS.PRESCRIPTIONS.UPDATE(doctorId, prescriptionId);
+        return api.put<any[]>(endpoint, payload);
+    },
+
+    /**
+     * Delete a prescription or specific variant.
+     */
+    async deletePrescription(doctorId: string, prescriptionId: string, variantId?: string): Promise<boolean> {
+        const endpoint = API_ENDPOINTS.PRESCRIPTIONS.DELETE(doctorId, prescriptionId);
+        // Delete usually doesn't take a body in standard fetch/axios unless configured, 
+        // but here we might need to send data. 
+        // api-client delete might support data as options or 2nd arg.
+        // Assuming api.delete(url, config) where config.data is the payload.
+        // If api-client wrapper supports it directly.
+        // Checking existing api-client usage or wrapper.
+        // If our api-client simple wrapper doesn't support body in delete easily, we might need a raw call or query params.
+        // Based on common practice, we'll try to pass data if the wrapper allows.
+        // For now, let's assume api.delete supports standard axios-like signature or we use request.
+
+        // Let's use api.request if needed, but for now assuming api.delete handles it or we send as data property.
+        // Wait, standard `api.delete` usually takes (url, config).
+        return api.delete<boolean>(endpoint, { body: JSON.stringify({ variant_id: variantId }) });
     },
 };

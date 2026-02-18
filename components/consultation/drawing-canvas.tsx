@@ -35,6 +35,7 @@ interface DrawingCanvasProps {
     penThickness: number;
     isErasing: boolean;
     onEdit?: () => void;
+    onClear?: () => void;
     showIndex?: boolean;
     canvasOnly?: boolean;
     isFullWidth?: boolean;
@@ -57,6 +58,7 @@ function DrawingCanvasComponent({
     penThickness,
     isErasing,
     onEdit,
+    onClear,
     showIndex = false,
     canvasOnly = false,
     isFullWidth = false,
@@ -216,7 +218,10 @@ function DrawingCanvasComponent({
         setPathColors([]);
         setPathWidths([]);
         hasUserDrawn.current = true;
-    }, []);
+        if (onClear) {
+            onClear();
+        }
+    }, [onClear]);
 
     const handleCanvasLayout = useCallback((event: any) => {
         const { width } = event.nativeEvent.layout;
@@ -268,11 +273,20 @@ function DrawingCanvasComponent({
         return renderCanvas();
     }
 
+    const hasDosage = !!(prescription?.dosage && prescription?.dosage !== 'N/A' && !prescription?.dosage.includes('-'));
+    const hasInstructions = !!prescription?.instructions;
+    const hasRow2 = !isFullWidth && (hasDosage || hasInstructions);
+    // Standardize heights to be tight and balanced
+    // 26px for single line, 46px for double line.
+    const calculatedDefaultHeight = isFullWidth
+        ? (prescription?.notes ? 60 : 30)
+        : (hasRow2 ? 46 : 26);
+
     return (
         <StandardRowLayout
             index={index || 0}
             prescription={prescription}
-            height={prescription?.height || (isFullWidth ? 60 : 70)}
+            height={prescription?.height || calculatedDefaultHeight}
             renderCanvas={renderCanvas}
             onExpand={onExpand || (() => { })}
             onDelete={onDelete || (() => { })}

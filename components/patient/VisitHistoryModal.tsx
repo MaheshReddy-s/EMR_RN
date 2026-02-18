@@ -10,7 +10,7 @@ import {
     View,
     StyleSheet,
 } from 'react-native';
-import { EDIT_PROFILE_ICONS } from '@/constants/icons';
+import { EDIT_PROFILE_ICONS, VISIT_HISTORY_ICONS } from '@/constants/icons';
 import { Icon } from '@/components/ui/Icon';
 import PdfViewer from '@/components/pdf-viewer';
 import { AuthRepository, PatientRepository } from '@/repositories';
@@ -19,6 +19,7 @@ import * as Sharing from 'expo-sharing';
 import * as Print from 'expo-print';
 import { VisitHistory } from '@/entities';
 import { mapPdfHistory, mapConsultationHistory, fetchAndDecryptFile } from '@/shared';
+import { buildConsultationSections, ConsultationDetailSection } from '@/shared/lib/consultation-mapper';
 
 interface VisitHistoryModalProps {
     visible: boolean;
@@ -36,6 +37,8 @@ export function VisitHistoryModal({ visible, onClose, patientId }: VisitHistoryM
     const [selectedVisit, setSelectedVisit] = useState<VisitHistory | null>(null);
     const [decryptedPdfUri, setDecryptedPdfUri] = useState<string | null>(null);
     const [decryptedBytes, setDecryptedBytes] = useState<Uint8Array | null>(null);
+    const [rawPayloads, setRawPayloads] = useState<Map<string, any>>(new Map());
+    const [sections, setSections] = useState<ConsultationDetailSection[]>([]);
 
     useEffect(() => {
         if (visible && patientId) {
@@ -91,6 +94,14 @@ export function VisitHistoryModal({ visible, onClose, patientId }: VisitHistoryM
                 return valB.localeCompare(valA);
             });
 
+            // Store raw payloads for native preview
+            const payloadsMap = new Map<string, any>();
+            consultations.forEach(c => {
+                const id = c._id || c.consultation_id || c.id;
+                if (id) payloadsMap.set(String(id), c);
+            });
+            setRawPayloads(payloadsMap);
+
             setHistory(finalHistory);
             if (finalHistory.length > 0) {
                 handleVisitSelect(finalHistory[0]);
@@ -110,6 +121,17 @@ export function VisitHistoryModal({ visible, onClose, patientId }: VisitHistoryM
         setDecryptedBytes(null);
 
         try {
+            // Native Preview Logic: If we have the raw consultation data, build sections
+            const visitId = visit.consultationID || visit.id;
+            const payload = rawPayloads.get(visitId);
+            if (payload) {
+                const mappedSections = buildConsultationSections(payload);
+                setSections(mappedSections);
+            } else {
+                setSections([]);
+            }
+
+            // Still fetch and decrypt PDF for Share/Print functionality
             let pdfPath = '';
             if (visit.name) {
                 pdfPath = API_ENDPOINTS.CONSULTATION.PDF_DOWNLOAD(visit.name);
@@ -132,12 +154,17 @@ export function VisitHistoryModal({ visible, onClose, patientId }: VisitHistoryM
                     file.write(result.bytes);
 
                     setDecryptedPdfUri(file.uri);
+                    console.log('Android PDF URI:', file.uri);
+
                 }
                 setDecryptedBytes(result.bytes);
             }
         } catch (error: any) {
             if (__DEV__) console.error('Decryption failed:', error);
-            Alert.alert('Error', error.message || 'Failed to decrypt the report.');
+            // Don't alert if we have sections to show as a fallback
+            if (sections.length === 0) {
+                Alert.alert('Error', error.message || 'Failed to decrypt the report.');
+            }
         } finally {
             setIsDecrypting(false);
         }
@@ -201,12 +228,29 @@ export function VisitHistoryModal({ visible, onClose, patientId }: VisitHistoryM
                                 <View style={styles.pdfContainer}>
                                     <PdfViewer uri={decryptedPdfUri} title="Consultation Report" />
                                 </View>
+                            ) : sections.length > 0 ? (
+                                <View style={styles.pdfContainer}>
+                                    <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
+                                        <View style={{ padding: 20 }}>
+                                            {sections.map((section) => (
+                                                <View key={section.key} style={{ marginBottom: 25 }}>
+                                                    <Text style={{ fontSize: 16, fontWeight: 'bold', marginBottom: 10 }}>
+                                                        {section.title}
+                                                    </Text>
+                                                </View>
+                                            ))}
+                                        </View>
+                                    </ScrollView>
+                                </View>
                             ) : (
                                 <View style={styles.centerContent}>
-                                    <Icon library="Ionicons" ios="document-text-outline" android="document-text-outline" size={80} color="#E5E7EB" />
-                                    <Text style={styles.placeholderText}>Select a visit history to view</Text>
+                                    <Icon icon={VISIT_HISTORY_ICONS.document} size={80} color="#E5E7EB" />
+                                    <Text style={styles.placeholderText}>
+                                        Select a visit history to view
+                                    </Text>
                                 </View>
                             )}
+
                         </View>
                     </View>
 
@@ -238,14 +282,14 @@ export function VisitHistoryModal({ visible, onClose, patientId }: VisitHistoryM
                                                 <View style={styles.actionRow}>
                                                     <TouchableOpacity onPress={handlePrint} style={styles.actionButton}>
                                                         <View style={styles.actionIconContainer}>
-                                                            <Icon library="Ionicons" ios="print-outline" android="print-outline" size={20} color="#007AFF" />
+                                                            <Icon icon={VISIT_HISTORY_ICONS.printer} size={20} color="#007AFF" />
                                                         </View>
                                                         <Text style={styles.actionLabel}>Print</Text>
                                                     </TouchableOpacity>
 
                                                     <TouchableOpacity onPress={handleShare} style={styles.actionButton}>
                                                         <View style={styles.actionIconContainer}>
-                                                            <Icon library="Ionicons" ios="share-social-outline" android="share-social-outline" size={20} color="#007AFF" />
+                                                            <Icon icon={VISIT_HISTORY_ICONS.share} size={20} color="#007AFF" />
                                                         </View>
                                                         <Text style={styles.actionLabel}>Share</Text>
                                                     </TouchableOpacity>

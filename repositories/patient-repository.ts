@@ -248,7 +248,7 @@ export const PatientRepository = {
 
                 const request = (async () => {
                     try {
-                        const results = await PatientService.searchPatients(doctorId, trimmedQuery);
+                        const results = await PatientService.searchPatients(clinicId, trimmedQuery);
                         if (__DEV__ && results.length >= DEV_LARGE_SEARCH_WARN_THRESHOLD) {
                             console.warn(
                                 `[PatientRepository] Search returned large dataset (${results.length}) for query "${trimmedQuery}".`

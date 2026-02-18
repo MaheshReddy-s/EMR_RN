@@ -47,7 +47,7 @@ export function useConsultationSuggestions({
                 fetchedItems = rxList.map((item) => ({
                     id: item._id || item.id,
                     label: item.brand_name || item.name || '',
-                    frequency: item.frequency || 0,
+                    frequency: item.usage_frequency || item.frequency || 0,
                     data: item,
                 }));
             } else {
@@ -115,13 +115,34 @@ export function useConsultationSuggestions({
             onOpenPrescription({
                 brandName: rxData.brand_name || suggestion.label,
                 genericName: rxData.generic_name || '',
-                variants: Array.isArray(rxData.variants) ? rxData.variants.map((v: any, idx: number) => ({
-                    id: `${v._id || v.id || Date.now()}-${idx}`,
-                    timings: v.timings || v.dosage || 'M-O-E-N',
-                    dosage: v.dosage || v.timings || '1-0-0-0',
-                    duration: v.duration || '5 Days',
-                    type: v.type || 'Tablet',
-                })) : [],
+                variants: Array.isArray(rxData.variants) ? rxData.variants.map((v: any, idxVar: number) => {
+                    const rawTimings = (v.frequency || v.time || v.timings || '').toUpperCase().split('-');
+                    // Ensure we have exactly 4 slots (M-A-E-N)
+                    while (rawTimings.length < 4) {
+                        rawTimings.push('');
+                    }
+                    const timings = rawTimings.slice(0, 4).map((p: string, idxValue: number) => {
+                        const val = p.trim();
+                        const isActive = val !== '0' && val !== 'O' && val !== '' && val !== '-';
+                        if (!isActive) return '-';
+                        if (idxValue === 0) return 'M';
+                        if (idxValue === 1) return 'A';
+                        if (idxValue === 2) return 'E';
+                        if (idxValue === 3) return 'N';
+                        return val;
+                    }).join('-');
+
+                    const rawDuration = v.duration || '';
+                    const durationText = rawDuration && /^\d+$/.test(rawDuration.toString()) ? `${rawDuration} Days` : rawDuration;
+
+                    return {
+                        id: v.variant_id || v._id || `${Date.now()}-${idxVar}`,
+                        timings: timings,
+                        dosage: v.quantity ? `${v.quantity}${v.units && v.units !== 'N/A' ? ` ${v.units}` : ''}` : (v.dosage || ''),
+                        duration: durationText,
+                        type: v.medicine_type || v.type || '',
+                    };
+                }) : [],
             });
             return;
         }

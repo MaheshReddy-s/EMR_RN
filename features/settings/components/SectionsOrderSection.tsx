@@ -1,7 +1,7 @@
 import React from 'react';
 import { Switch, Text, View } from 'react-native';
 import DraggableFlatList, { RenderItemParams } from 'react-native-draggable-flatlist';
-import { TouchableOpacity as GHTouchableOpacity } from 'react-native-gesture-handler';
+import { TouchableOpacity } from 'react-native';
 import { SETTINGS_ICONS } from '@/constants/icons';
 import { Icon } from '@/components/ui/Icon';
 import SettingsSectionHeader from '@/features/settings/components/SettingsSectionHeader';
@@ -23,7 +23,7 @@ const SectionsOrderSection = ({
     onLogoutPress,
 }: SectionsOrderSectionProps) => {
     const renderSectionItem = ({ item, drag, isActive }: RenderItemParams<ListItem>) => (
-        <GHTouchableOpacity onLongPress={drag} disabled={isActive}>
+        <TouchableOpacity onLongPress={drag} disabled={isActive}>
             <View
                 style={{ backgroundColor: isActive ? '#EFF6FF' : 'white' }}
                 className={`flex-row items-center justify-between p-4 border-b border-gray-100 ${isActive ? 'shadow-sm z-10' : ''}`}
@@ -46,7 +46,7 @@ const SectionsOrderSection = ({
                     thumbColor={item.enabled ? '#FFFFFF' : '#F9FAFB'}
                 />
             </View>
-        </GHTouchableOpacity>
+        </TouchableOpacity>
     );
 
     return (

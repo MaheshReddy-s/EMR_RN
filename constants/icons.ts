@@ -295,12 +295,20 @@ export const PRESCRIPTION_MODAL_ICONS = {
         android: 'add',
     } as IconDef,
 
-    /** Edit variant */
-    createOutline: {
+    /** Edit variant - circle */
+    editCircle: {
+        library: 'MaterialIcons',
+        iosLibrary: 'SFSymbols',
+        ios: 'pencil.circle',
+        android: 'edit',
+    } as IconDef,
+
+    /** Apply variant - circle */
+    checkmarkCircle: {
         library: 'Ionicons',
         iosLibrary: 'SFSymbols',
-        ios: 'pencil.and.outline',
-        android: 'create-outline',
+        ios: 'checkmark.circle',
+        android: 'checkmark-circle-outline',
     } as IconDef,
 
     /** Delete variant */
@@ -616,6 +624,30 @@ export const PATIENT_ICONS = {
         iosLibrary: 'SFSymbols',
         ios: 'square.and.arrow.up',
         android: 'export-variant',
+    } as IconDef,
+};
+
+// ─────────────────────────────────────────────
+// Visit History Modal Icons
+// ─────────────────────────────────────────────
+export const VISIT_HISTORY_ICONS = {
+    document: {
+        library: 'MaterialCommunityIcons',
+        iosLibrary: 'SFSymbols',
+        ios: 'doc.text',
+        android: 'file-document-outline',
+    } as IconDef,
+    printer: {
+        library: 'MaterialCommunityIcons',
+        iosLibrary: 'SFSymbols',
+        ios: 'printer',
+        android: 'printer',
+    } as IconDef,
+    share: {
+        library: 'MaterialCommunityIcons',
+        iosLibrary: 'SFSymbols',
+        ios: 'square.and.arrow.up',
+        android: 'share-variant',
     } as IconDef,
 };
 

@@ -216,9 +216,11 @@ export function useConsultationSubmit({
                     duration: p.duration || '',
                     drawings: normalizeDrawings(p.drawings),
                     variants: [{
-                        timings: p.dosage || 'M-O-E-N',
-                        dosage: '1-0-0-0',
+                        timings: p.timings || 'M-O-E-N',
+                        dosage: p.dosage || '',
                         duration: p.duration || '5 Days',
+                        type: p.type || 'Tablet',
+                        instructions: p.instructions || '',
                     }],
                 })),
                 instruction: mapSectionItems(instruction),
@@ -255,7 +257,7 @@ export function useConsultationSubmit({
                 });
             }
 
-            const pdfUri = await PdfService.createPdf(previewData as any);
+            const pdfUri = await PdfService.createEncryptedPdf(previewData as any);
             if (!pdfUri) {
                 throw new AppError({
                     code: APP_ERROR_CODES.UNKNOWN,

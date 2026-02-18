@@ -1,8 +1,11 @@
 import { StrokeData } from '@/components/consultation/drawing-canvas';
 import { API_REFERENCE_WIDTH, FIXED_CONTENT_WIDTH } from '@/components/consultation/prescription-row-layout';
-import { User } from '@/services/auth-service';
-import { Patient } from '@/services/patient-service';
+import { User, Patient } from '@/entities';
 import { Platform } from 'react-native';
+import { File as FSFile, Paths } from 'expo-file-system';
+import { AuthRepository } from '@/repositories';
+import { getDecryptedMasterKey, encryptAesGcm } from '@/shared/lib/crypto-service';
+import CryptoJS from 'crypto-js';
 
 /**
  * PdfService
@@ -17,6 +20,8 @@ export interface PdfSectionItem {
     dosage?: string;
     duration?: string;
     notes?: string;
+    instructions?: string;
+    timings?: string;
     drawings?: StrokeData[];
     height?: number;
     isPrescription?: boolean;
@@ -119,6 +124,57 @@ export const PdfService = {
             if (__DEV__) console.error('[PdfService] Share failed:', e);
         }
     },
+
+    /**
+     * Generate, encrypt and save a PDF file.
+     * Returns the URI of the ENCRYPTED file.
+     */
+    async createEncryptedPdf(data: PdfData): Promise<string | null> {
+        if (Platform.OS === 'web') return null; // Web print doesn't use encryption path
+
+        try {
+            // 1. Generate local PDF
+            const rawUri = await this.createPdf(data);
+            if (!rawUri) return null;
+
+            // 2. Read PDF bytes
+            const pdfFile = new FSFile(rawUri);
+            const bytesRaw = await pdfFile.bytes();
+
+            // 3. Get encryption key
+            const encryptedKey = await AuthRepository.getFileEncryptionKey();
+            if (!encryptedKey) throw new Error('Missing encryption key');
+
+            const masterKeyBytes = await getDecryptedMasterKey(encryptedKey);
+
+            // 4. Encrypt with AES-GCM
+            const encryptedBytes = await encryptAesGcm(bytesRaw, masterKeyBytes);
+
+            // 5. Convert to Base64 of the ENCRYPTED payload (IV + Ciphertext)
+            // Backend expects the base64 of the raw encrypted binary
+            let binary = '';
+            const len = encryptedBytes.byteLength;
+            for (let i = 0; i < len; i++) {
+                binary += String.fromCharCode(encryptedBytes[i]);
+            }
+            const encryptedBase64 = btoa(binary);
+
+            // 6. Save encrypted binary to temp file
+            const encryptedFileName = `encrypted_consultation_${Date.now()}.pdf`;
+            const encryptedFile = new FSFile(Paths.cache, encryptedFileName);
+            await encryptedFile.write(encryptedBytes);
+
+            const encryptedUri = encryptedFile.uri;
+
+            // Clean up raw PDF
+            try { await pdfFile.delete(); } catch (err) { }
+
+            return encryptedUri;
+        } catch (error) {
+            if (__DEV__) console.error('[PdfService] Encryption failed:', error);
+            return null;
+        }
+    },
 };
 
 // Use API_REFERENCE_WIDTH (820) for the viewBox to match DrawingCanvas logical space
@@ -156,28 +212,51 @@ function buildHtml(data: PdfData): string {
             const displayTitle = section.title === 'Instructions' ? 'Instruction' : section.title;
 
             const rowsHtml = section.items.map((item, idx) => {
-                // Match DrawingCanvas default heights
-                const rowHeight = item.height || 32;
-                const dosage = item.dosage || '';
-                const duration = item.duration || '';
+                const hasDosage = !!(item.dosage && item.dosage !== 'N/A' && !item.dosage.includes('-'));
+                const hasInstructions = !!item.instructions;
+                const hasNotes = !!(!isPrescriptions && item.notes);
+                const hasRow2 = !isPrescriptions && (hasDosage || hasInstructions);
+
+                // Match DrawingCanvas default heights exactly
+                const calculatedDefaultHeight = !isPrescriptions
+                    ? (item.notes ? 60 : 30)
+                    : ((hasDosage || hasInstructions) ? 46 : 26);
+
+                let rowHeight = item.height || calculatedDefaultHeight;
+
+                // Safety: if we have drawings but height is too small, force a minimum 
+                // to prevent clipping in the SVG viewport.
+                if (item.drawings && item.drawings.length > 0 && rowHeight < 40) {
+                    rowHeight = 40;
+                }
 
                 return `
-                <div class="prescription-row" style="min-height: ${rowHeight}px;">
-                    <div class="canvas-overlay">
+                <div class="prescription-row" style="height: ${rowHeight}px;">
+                    <div class="canvas-overlay" style="height: ${rowHeight}px;">
                         ${renderStrokesToSvg(item.drawings, rowHeight)}
                     </div>
                     <div class="text-layer">
-                        <div class="row-flex">
-                            <div class="name-container">
-                                <span class="name ${!isPrescriptions ? 'name-full' : ''}">${escapeHtml(item.name)}</span>
-                            </div>
+                        <div class="row-1" style="height: ${isPrescriptions ? '25px' : 'auto'}; position: relative; min-height: 22px;">
+                            ${isPrescriptions ? `<span class="number">${idx + 1}.</span>` : ''}
+                            <span class="name ${!isPrescriptions ? 'name-full' : ''}" style="${isPrescriptions ? `left: ${isPrescriptions ? 28 : 10}px;` : `padding-left: ${isPrescriptions ? 28 : 10}px;`}">
+                                ${isPrescriptions ? escapeHtml(item.name).toUpperCase() : escapeHtml(item.name)}
+                            </span>
                             ${isPrescriptions ? `
-                                <div class="dosage-duration">
-                                    <span class="dosage">${escapeHtml(dosage)}</span>
-                                    <span class="duration">${escapeHtml(duration)}</span>
-                                </div>
+                                <div class="timings-center">${escapeHtml(item.timings)}</div>
+                                <div class="duration-right">${escapeHtml(item.duration)}</div>
                             ` : ''}
                         </div>
+                        ${isPrescriptions && (hasDosage || hasInstructions) ? `
+                        <div class="row-2" style="height: 20px; top: 26px; position: absolute;">
+                            <div class="dosage-sub" style="left: 10px; width: 280px;">${escapeHtml(hasDosage ? item.dosage : '')}</div>
+                            <div class="instructions-sub" style="left: 310px; width: 400px;">${escapeHtml(item.instructions)}</div>
+                        </div>
+                        ` : ''}
+                        ${!isPrescriptions && item.notes ? `
+                        <div class="row-notes">
+                            ${escapeHtml(item.notes)}
+                        </div>
+                        ` : ''}
                     </div>
                 </div>
                 `;
@@ -260,40 +339,60 @@ function buildHtml(data: PdfData): string {
                 border-bottom: 1px solid #f2f2f2; 
                 page-break-inside: avoid;
                 display: block;
-                min-height: 32px;
-            }
-
-            .row-flex {
-                display: flex;
-                flex-direction: row;
-                align-items: flex-start;
-                padding: 1px 10px;
-                width: 100%;
-                z-index: 20;
             }
 
             .text-layer {
-                position: relative;
+                position: absolute;
+                top: 0; left: 0; right: 0;
                 z-index: 20;
                 pointer-events: none;
                 width: 100%;
             }
+
+            .row-1 { position: relative; width: 100%; }
+            .row-2 { position: relative; width: 100%; margin-top: 1px; }
+            .row-notes { padding: 0 10px; font-size: 13.5px; color: #6c757d; line-height: 1.2; }
             
-            .number { width: 22px; font-size: 13.5px; font-weight: 600; color: #666; flex-shrink: 0; }
-            .name-container { flex: 1; margin-right: 10px; }
-            .name { font-size: 13.5px; font-weight: 700; color: #000; line-height: 1.2; display: block; }
-            .name-full { font-weight: 400; font-size: 13px; }
+            .number { 
+                position: absolute; left: 10px; top: 1px;
+                width: 25px; font-size: 13.5px; font-weight: 600; color: #666; 
+            }
+            .name { 
+                position: absolute; top: 1px;
+                font-size: 13.5px; font-weight: 700; color: #000; 
+                line-height: 1.2;
+                display: -webkit-box;
+                -webkit-line-clamp: 1;
+                -webkit-box-orient: vertical;
+                overflow: hidden;
+            }
+            .name-full { 
+                position: relative;
+                font-weight: 400; color: #495057; 
+                -webkit-line-clamp: 2;
+                width: 95%;
+                display: block;
+                display: -webkit-box;
+            }
             
-            .dosage-duration {
-                display: flex;
-                flex-direction: row;
-                width: 45%;
-                justify-content: flex-end;
-                flex-shrink: 0;
+            .timings-center {
+                position: absolute; left: 310px; top: 1px;
+                width: 240px; font-size: 13.5px; font-weight: 700; color: #495057;
             }
 
-            .dosage { font-size: 13.5px; font-weight: 700; text-align: right; flex: 1; margin-right: 10px; }
-            .duration { font-size: 13.2px; font-weight: 700; text-align: right; min-width: 60px; }
+            .duration-right {
+                position: absolute; right: 10px; top: 1px;
+                font-size: 13.2px; font-weight: 700; color: #000; text-align: right;
+            }
+
+            .dosage-sub {
+                position: absolute; top: 0px;
+                font-size: 13.5px; color: #000;
+            }
+            .instructions-sub {
+                position: absolute; top: 0px;
+                font-size: 13.5px; color: #000; font-style: italic;
+            }
 
             .canvas-overlay { 
                 position: absolute; 

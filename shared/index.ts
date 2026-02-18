@@ -10,6 +10,7 @@ export {
     decryptAesGcm,
     fetchAndDecryptFile,
     decryptAssetUrl,
+    bytesToBase64,
 } from './lib/crypto-service';
 
 export type { DecryptedResult } from './lib/crypto-service';
