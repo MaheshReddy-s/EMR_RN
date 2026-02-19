@@ -19,6 +19,8 @@ interface AppointmentsPanelProps {
     onSearchClear: () => void;
     appointments: Appointment[];
     isLoading: boolean;
+    isRefreshing: boolean;
+    onRefresh: () => void;
     onAppointmentPress: (item: Appointment) => void;
 }
 
@@ -35,6 +37,8 @@ const AppointmentsPanel = ({
     onSearchClear,
     appointments,
     isLoading,
+    isRefreshing,
+    onRefresh,
     onAppointmentPress,
 }: AppointmentsPanelProps) => {
     useRenderCountGuard('AppointmentsPanel');
@@ -61,8 +65,10 @@ const AppointmentsPanel = ({
                 keyExtractor={(item) => item.id}
                 className="flex-1 bg-white"
                 showsVerticalScrollIndicator={false}
+                refreshing={isRefreshing}
+                onRefresh={onRefresh}
                 ListEmptyComponent={
-                    !isLoading ? (
+                    !isLoading && !isRefreshing ? (
                         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 80 }}>
                             <Text style={{ fontSize: 17, fontWeight: '600', color: '#8E8E93' }}>No Appointments</Text>
                         </View>

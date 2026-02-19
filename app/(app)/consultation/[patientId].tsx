@@ -136,11 +136,12 @@ export default function ConsultationScreen() {
         },
     });
 
-    const preparePrintPreview = (enabledSectionIds?: string[]) => {
+    const preparePrintPreview = (enabledSectionIds?: string[], overrideFollowUpDate?: Date | null) => {
         if (!patient || !user) {
             Alert.alert('Error', 'Patient or User data missing');
             return;
         }
+        const resolvedFollowUpDate = overrideFollowUpDate !== undefined ? overrideFollowUpDate : followUpDate;
         const ids = enabledSectionIds || DEFAULT_PDF_SECTION_IDS;
         const sections: PdfSection[] = [
             { id: 'complaints', title: 'Chief Complaints', items: complaints },
@@ -157,7 +158,7 @@ export default function ConsultationScreen() {
             doctor: user,
             date: new Date().toLocaleDateString('en-GB'),
             sections,
-            followUpDate: followUpDate ? followUpDate.toLocaleDateString('en-GB') : undefined,
+            followUpDate: resolvedFollowUpDate ? resolvedFollowUpDate.toLocaleDateString('en-GB') : undefined,
         };
         setPreviewHtml(PdfService.generateHtml(data));
         setPreviewData(data);
@@ -196,8 +197,8 @@ export default function ConsultationScreen() {
     const handleStrokesChange = useCallback((section: TabType, id: string, strokes: StrokeData[]) => setStrokes(section, id, strokes), [setStrokes]);
     const handleBack = () => router.back();
     const handleNext = () => setIsFollowUpModalVisible(true);
-    const handleFollowUpContinue = (date: Date) => { setFollowUpDate(date); setIsFollowUpModalVisible(false); preparePrintPreview(); };
-    const handleFollowUpSkip = () => { setFollowUpDate(null); setIsFollowUpModalVisible(false); preparePrintPreview(); };
+    const handleFollowUpContinue = (date: Date) => { setFollowUpDate(date); setIsFollowUpModalVisible(false); preparePrintPreview(undefined, date); };
+    const handleFollowUpSkip = () => { setFollowUpDate(null); setIsFollowUpModalVisible(false); preparePrintPreview(undefined, null); };
     const generatePdfReport = async (enabledSectionIds: string[]) => preparePrintPreview(enabledSectionIds);
 
     const handleExpandRow = (section: TabType, id: string) => {
@@ -206,10 +207,18 @@ export default function ConsultationScreen() {
     };
 
 
-    const handleClearAll = (section: TabType) => {
-        Alert.alert('Clear All', `Are you sure you want to clear all items in ${SECTION_LABELS[section]}?`, [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Clear', style: 'destructive', onPress: () => clearSection(section) },
+    const handleClearAll = (_section: TabType) => {
+        Alert.alert('Clear All', 'Are you sure you want to clear all the data?', [
+            { text: 'No', style: 'cancel' },
+            {
+                text: 'Yes',
+                style: 'destructive',
+                onPress: () => {
+                    SECTION_KEYS.forEach((key) => clearSection(key));
+                    setWritingText('');
+                    setCurrentInputStrokes([]);
+                },
+            },
         ]);
     };
 

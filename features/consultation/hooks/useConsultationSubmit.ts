@@ -9,6 +9,12 @@ import { PdfService } from '@/services/pdf-service';
 import { OfflinePdfUploadQueue } from '@/services/offline-pdf-upload-queue';
 import { APP_ERROR_CODES, AppError } from '@/shared/lib/app-error';
 import { normalizeApiError } from '@/shared/lib/error-normalizer';
+import {
+    NON_PRESCRIPTION_DEFAULT_ROW_HEIGHT,
+    NON_PRESCRIPTION_NOTES_DEFAULT_ROW_HEIGHT,
+    PRESCRIPTION_DEFAULT_ROW_HEIGHT,
+    PRESCRIPTION_WITH_ROW_2_DEFAULT_ROW_HEIGHT
+} from '@/components/consultation/prescription-row-layout';
 
 interface UseConsultationSubmitParams {
     consultation: ConsultationState;
@@ -109,16 +115,34 @@ function normalizeDrawings(drawings?: StrokeData[]): StrokeData[] {
     }));
 }
 
+function toPositiveHeight(value: unknown): number {
+    if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
+        return value;
+    }
+    if (typeof value === 'string') {
+        const parsed = Number(value);
+        if (Number.isFinite(parsed) && parsed > 0) {
+            return parsed;
+        }
+    }
+    return 0;
+}
+
 function mapSectionItems(items: ConsultationItem[]) {
     return items
         .filter((item) => (item.name && item.name.trim().length > 0) || (item.drawings?.length ?? 0) > 0)
-        .map((item) => ({
-            name: item.name?.trim() || '',
-            notes: item.notes,
-            genericName: item.genericName,
-            drawings: normalizeDrawings(item.drawings),
-            height: item.height,
-        }));
+        .map((item) => {
+            const fallbackHeight = item.notes
+                ? NON_PRESCRIPTION_NOTES_DEFAULT_ROW_HEIGHT
+                : NON_PRESCRIPTION_DEFAULT_ROW_HEIGHT;
+            return {
+                name: item.name?.trim() || '',
+                notes: item.notes,
+                genericName: item.genericName,
+                drawings: normalizeDrawings(item.drawings),
+                height: toPositiveHeight(item.height) || fallbackHeight,
+            };
+        });
 }
 
 function extractConsultationId(response: Record<string, unknown>): string | null {
@@ -209,20 +233,29 @@ export function useConsultationSubmit({
                 examination: mapSectionItems(examination),
                 investigation: mapSectionItems(investigation),
                 procedure: mapSectionItems(procedure),
-                prescriptions: prescriptions.map((p) => ({
-                    brand_name: p.name,
-                    generic_name: p.genericName,
-                    dosage: p.dosage || '',
-                    duration: p.duration || '',
-                    drawings: normalizeDrawings(p.drawings),
-                    variants: [{
-                        timings: p.timings || 'M-O-E-N',
+                prescriptions: prescriptions.map((p) => {
+                    const hasDosage = !!(p.dosage && p.dosage !== 'N/A' && !p.dosage.includes('-'));
+                    const hasInstructions = !!p.instructions;
+                    const fallbackHeight = (hasDosage || hasInstructions)
+                        ? PRESCRIPTION_WITH_ROW_2_DEFAULT_ROW_HEIGHT
+                        : PRESCRIPTION_DEFAULT_ROW_HEIGHT;
+
+                    return {
+                        brand_name: p.name,
+                        generic_name: p.genericName,
                         dosage: p.dosage || '',
-                        duration: p.duration || '5 Days',
-                        type: p.type || 'Tablet',
-                        instructions: p.instructions || '',
-                    }],
-                })),
+                        duration: p.duration || '',
+                        drawings: normalizeDrawings(p.drawings),
+                        height: toPositiveHeight(p.height) || fallbackHeight,
+                        variants: [{
+                            timings: p.timings || 'M-O-E-N',
+                            dosage: p.dosage || '',
+                            duration: p.duration || '5 Days',
+                            type: p.type || 'Tablet',
+                            instructions: p.instructions || '',
+                        }],
+                    };
+                }),
                 instruction: mapSectionItems(instruction),
                 notes: mapSectionItems(notes),
                 follow_up_date: followUpDate ? toUnixSeconds(followUpDate) : undefined,

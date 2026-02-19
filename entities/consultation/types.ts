@@ -48,6 +48,7 @@ export interface PrescriptionPayload {
     dosage?: string;
     duration?: string;
     drawings?: StrokeData[];
+    height?: number;
     variants: Array<{
         timings: string;
         dosage: string;
@@ -80,6 +81,7 @@ export interface ConsultationItemPayload {
     notes?: string;
     drawings?: StrokeData[];
     genericName?: string;
+    height?: number;
 }
 
 /** Full consultation record submitted to the backend */

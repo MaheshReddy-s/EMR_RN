@@ -1,5 +1,19 @@
 import { StrokeData } from '@/components/consultation/drawing-canvas';
-import { API_REFERENCE_WIDTH, FIXED_CONTENT_WIDTH } from '@/components/consultation/prescription-row-layout';
+import {
+    API_REFERENCE_WIDTH,
+    FIXED_CONTENT_WIDTH,
+    NON_PRESCRIPTION_DEFAULT_ROW_HEIGHT,
+    NON_PRESCRIPTION_HORIZONTAL_PADDING,
+    NON_PRESCRIPTION_NAME_LINE_HEIGHT,
+    NON_PRESCRIPTION_NOTES_DEFAULT_ROW_HEIGHT,
+    NON_PRESCRIPTION_NOTES_LINE_HEIGHT,
+    NON_PRESCRIPTION_VERTICAL_PADDING,
+    PRESCRIPTION_DEFAULT_ROW_HEIGHT,
+    PRESCRIPTION_ROW_1_HEIGHT,
+    PRESCRIPTION_ROW_2_HEIGHT,
+    PRESCRIPTION_ROW_2_MARGIN_TOP,
+    PRESCRIPTION_WITH_ROW_2_DEFAULT_ROW_HEIGHT
+} from '@/components/consultation/prescription-row-layout';
 import { User, Patient } from '@/entities';
 import { Platform } from 'react-native';
 import { File as FSFile, Paths } from 'expo-file-system';
@@ -41,6 +55,10 @@ interface PdfData {
     date: string;
 }
 
+interface PdfRenderOptions {
+    includeHeaderFooter?: boolean;
+}
+
 /**
  * Escape HTML special characters to prevent XSS in generated PDFs.
  */
@@ -70,8 +88,8 @@ export const PdfService = {
      * Generate HTML content for the PDF.
      * Exported so it can be used for Live Preview in a WebView.
      */
-    generateHtml(data: PdfData): string {
-        return buildHtml(data);
+    generateHtml(data: PdfData, options?: PdfRenderOptions): string {
+        return buildHtml(data, options);
     },
 
     /**
@@ -201,8 +219,24 @@ function renderStrokesToSvg(strokes: StrokeData[] | undefined, height: number = 
     `;
 }
 
-function buildHtml(data: PdfData): string {
+function toPositiveHeight(height: unknown): number {
+    if (typeof height === 'number' && Number.isFinite(height) && height > 0) return height;
+    if (typeof height === 'string') {
+        const parsed = Number(height);
+        if (Number.isFinite(parsed) && parsed > 0) return parsed;
+    }
+    return 0;
+}
+
+function normalizeDurationForDisplay(duration: string | undefined): string {
+    const trimmed = (duration || '').trim();
+    if (!trimmed) return '';
+    return /^\d+$/.test(trimmed) ? `${trimmed} Days` : trimmed;
+}
+
+function buildHtml(data: PdfData, options?: PdfRenderOptions): string {
     const { patient, doctor, sections, date, followUpDate } = data;
+    const includeHeaderFooter = options?.includeHeaderFooter !== false;
 
     const sectionsHtml = sections
         .filter((s) => s.items.length > 0)
@@ -214,49 +248,51 @@ function buildHtml(data: PdfData): string {
             const rowsHtml = section.items.map((item, idx) => {
                 const hasDosage = !!(item.dosage && item.dosage !== 'N/A' && !item.dosage.includes('-'));
                 const hasInstructions = !!item.instructions;
-                const hasNotes = !!(!isPrescriptions && item.notes);
-                const hasRow2 = !isPrescriptions && (hasDosage || hasInstructions);
+                const hasRow2 = isPrescriptions && (hasDosage || hasInstructions);
 
-                // Match DrawingCanvas default heights exactly
-                const calculatedDefaultHeight = !isPrescriptions
-                    ? (item.notes ? 60 : 30)
-                    : ((hasDosage || hasInstructions) ? 46 : 26);
+                const calculatedDefaultHeight = isPrescriptions
+                    ? (hasRow2 ? PRESCRIPTION_WITH_ROW_2_DEFAULT_ROW_HEIGHT : PRESCRIPTION_DEFAULT_ROW_HEIGHT)
+                    : (item.notes ? NON_PRESCRIPTION_NOTES_DEFAULT_ROW_HEIGHT : NON_PRESCRIPTION_DEFAULT_ROW_HEIGHT);
 
-                let rowHeight = item.height || calculatedDefaultHeight;
+                const apiHeight = toPositiveHeight(item.height);
+                // Keep preview row height aligned with consultation row height.
+                // Do not auto-expand based on stroke bounds.
+                const rowMinHeight = Math.max(calculatedDefaultHeight, apiHeight);
 
-                // Safety: if we have drawings but height is too small, force a minimum 
-                // to prevent clipping in the SVG viewport.
-                if (item.drawings && item.drawings.length > 0 && rowHeight < 40) {
-                    rowHeight = 40;
+                if (isPrescriptions) {
+                    return `
+                    <div class="consultation-row row-prescription" style="min-height: ${rowMinHeight}px;">
+                        <div class="canvas-overlay">
+                            ${renderStrokesToSvg(item.drawings, rowMinHeight)}
+                        </div>
+                        <div class="text-layer text-layer-prescription">
+                            <div class="prescription-row-1">
+                                <span class="number">${idx + 1}.</span>
+                                <span class="name-prescription">
+                                    ${escapeHtml(item.name).toUpperCase()}
+                                </span>
+                                <div class="timings-center">${escapeHtml(item.timings)}</div>
+                                <div class="duration-right">${escapeHtml(normalizeDurationForDisplay(item.duration))}</div>
+                            </div>
+                            ${hasRow2 ? `
+                                <div class="prescription-row-2">
+                                    <div class="dosage-sub">${escapeHtml(hasDosage ? item.dosage : '')}</div>
+                                    <div class="instructions-sub">${escapeHtml(item.instructions)}</div>
+                                </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                    `;
                 }
 
                 return `
-                <div class="prescription-row" style="height: ${rowHeight}px;">
-                    <div class="canvas-overlay" style="height: ${rowHeight}px;">
-                        ${renderStrokesToSvg(item.drawings, rowHeight)}
+                <div class="consultation-row row-generic" style="min-height: ${rowMinHeight}px;">
+                    <div class="canvas-overlay">
+                        ${renderStrokesToSvg(item.drawings, rowMinHeight)}
                     </div>
-                    <div class="text-layer">
-                        <div class="row-1" style="height: ${isPrescriptions ? '25px' : 'auto'}; position: relative; min-height: 22px;">
-                            ${isPrescriptions ? `<span class="number">${idx + 1}.</span>` : ''}
-                            <span class="name ${!isPrescriptions ? 'name-full' : ''}" style="${isPrescriptions ? `left: ${isPrescriptions ? 28 : 10}px;` : `padding-left: ${isPrescriptions ? 28 : 10}px;`}">
-                                ${isPrescriptions ? escapeHtml(item.name).toUpperCase() : escapeHtml(item.name)}
-                            </span>
-                            ${isPrescriptions ? `
-                                <div class="timings-center">${escapeHtml(item.timings)}</div>
-                                <div class="duration-right">${escapeHtml(item.duration)}</div>
-                            ` : ''}
-                        </div>
-                        ${isPrescriptions && (hasDosage || hasInstructions) ? `
-                        <div class="row-2" style="height: 20px; top: 26px; position: absolute;">
-                            <div class="dosage-sub" style="left: 10px; width: 280px;">${escapeHtml(hasDosage ? item.dosage : '')}</div>
-                            <div class="instructions-sub" style="left: 310px; width: 400px;">${escapeHtml(item.instructions)}</div>
-                        </div>
-                        ` : ''}
-                        ${!isPrescriptions && item.notes ? `
-                        <div class="row-notes">
-                            ${escapeHtml(item.notes)}
-                        </div>
-                        ` : ''}
+                    <div class="text-layer text-layer-generic">
+                        <div class="generic-name">${escapeHtml(item.name)}</div>
+                        ${item.notes ? `<div class="generic-notes">${escapeHtml(item.notes)}</div>` : ''}
                     </div>
                 </div>
                 `;
@@ -272,6 +308,14 @@ function buildHtml(data: PdfData): string {
             `;
         })
         .join('');
+
+    const followUpDateText = (followUpDate || '').trim();
+    const nextConsultationDateHtml = followUpDateText ? `
+            <div class="section-container section-next-consultation">
+                <div class="section-title"><u>Next Consultation Date</u></div>
+                <div class="next-consultation-row">${escapeHtml(followUpDateText)}</div>
+            </div>
+            ` : '';
 
     const clinicName = escapeHtml(doctor.clinic_name || doctor.clinicDetails?.clinic_name || 'Avance');
     const clinicAddress = escapeHtml(doctor.clinicDetails?.address || doctor.address || 'AECS Layout, Kundalahalli, Bengaluru');
@@ -332,49 +376,96 @@ function buildHtml(data: PdfData): string {
                 color: #000;
                 text-decoration: underline;
             }
+            .next-consultation-row {
+                width: ${FIXED_CONTENT_WIDTH}px;
+                min-height: ${NON_PRESCRIPTION_DEFAULT_ROW_HEIGHT}px;
+                border-bottom: 1px solid #f2f2f2;
+                font-size: 14px;
+                font-weight: 500;
+                color: #212529;
+                display: flex;
+                align-items: center;
+                padding: ${NON_PRESCRIPTION_VERTICAL_PADDING}px ${NON_PRESCRIPTION_HORIZONTAL_PADDING}px;
+            }
             
-            .prescription-row { 
+            .consultation-row { 
                 position: relative;
                 width: ${FIXED_CONTENT_WIDTH}px;
                 border-bottom: 1px solid #f2f2f2; 
                 page-break-inside: avoid;
                 display: block;
+                overflow: visible;
             }
 
             .text-layer {
-                position: absolute;
-                top: 0; left: 0; right: 0;
                 z-index: 20;
                 pointer-events: none;
                 width: 100%;
             }
 
+            .text-layer-prescription {
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+            }
+
+            .text-layer-generic {
+                position: relative;
+                padding-left: ${NON_PRESCRIPTION_HORIZONTAL_PADDING}px;
+                padding-right: ${NON_PRESCRIPTION_HORIZONTAL_PADDING}px;
+                padding-top: ${NON_PRESCRIPTION_VERTICAL_PADDING}px;
+                padding-bottom: ${NON_PRESCRIPTION_VERTICAL_PADDING}px;
+            }
+
+            .generic-name {
+                min-height: ${NON_PRESCRIPTION_NAME_LINE_HEIGHT}px;
+                font-size: 14px;
+                font-weight: 400;
+                color: #495057;
+                line-height: ${NON_PRESCRIPTION_NAME_LINE_HEIGHT}px;
+                white-space: pre-wrap;
+                word-break: break-word;
+            }
+
+            .generic-notes {
+                margin-top: 2px;
+                font-size: 14px;
+                color: #6c757d;
+                line-height: ${NON_PRESCRIPTION_NOTES_LINE_HEIGHT}px;
+                white-space: pre-wrap;
+                word-break: break-word;
+            }
+
             .row-1 { position: relative; width: 100%; }
             .row-2 { position: relative; width: 100%; margin-top: 1px; }
-            .row-notes { padding: 0 10px; font-size: 13.5px; color: #6c757d; line-height: 1.2; }
             
             .number { 
                 position: absolute; left: 10px; top: 1px;
                 width: 25px; font-size: 13.5px; font-weight: 600; color: #666; 
             }
-            .name { 
-                position: absolute; top: 1px;
+            .prescription-row-1 {
+                height: ${PRESCRIPTION_ROW_1_HEIGHT}px;
+                position: relative;
+                min-height: 22px;
+            }
+            .prescription-row-2 {
+                height: ${PRESCRIPTION_ROW_2_HEIGHT}px;
+                position: relative;
+                margin-top: ${PRESCRIPTION_ROW_2_MARGIN_TOP}px;
+            }
+            .name-prescription { 
+                position: absolute;
+                left: 28px;
+                top: 1px;
+                width: 235px;
                 font-size: 13.5px; font-weight: 700; color: #000; 
                 line-height: 1.2;
-                display: -webkit-box;
-                -webkit-line-clamp: 1;
-                -webkit-box-orient: vertical;
+                text-transform: uppercase;
+                white-space: nowrap;
                 overflow: hidden;
+                text-overflow: ellipsis;
             }
-            .name-full { 
-                position: relative;
-                font-weight: 400; color: #495057; 
-                -webkit-line-clamp: 2;
-                width: 95%;
-                display: block;
-                display: -webkit-box;
-            }
-            
             .timings-center {
                 position: absolute; left: 310px; top: 1px;
                 width: 240px; font-size: 13.5px; font-weight: 700; color: #495057;
@@ -386,11 +477,11 @@ function buildHtml(data: PdfData): string {
             }
 
             .dosage-sub {
-                position: absolute; top: 0px;
+                position: absolute; top: 0px; left: 10px; width: 280px;
                 font-size: 13.5px; color: #000;
             }
             .instructions-sub {
-                position: absolute; top: 0px;
+                position: absolute; top: 0px; left: 310px; width: 400px;
                 font-size: 13.5px; color: #000; font-style: italic;
             }
 
@@ -413,9 +504,15 @@ function buildHtml(data: PdfData): string {
             .sig-area { text-align: right; }
             .sig-placeholder { width: 150px; height: 35px; margin-left: auto; }
             .sig-name { font-weight: 700; font-size: 14px; }
+            ${includeHeaderFooter ? '' : `
+            .header { display: none; }
+            .footer { display: none; }
+            main { padding-top: 6px; }
+            `}
         </style>
     </head>
     <body>
+        ${includeHeaderFooter ? `
         <div class="header">
             <div class="clinic-row">
                 ${clinicLogo ? `<img src="${clinicLogo}" class="clinic-logo" />` : ''}
@@ -446,11 +543,14 @@ function buildHtml(data: PdfData): string {
                 </div>
             </div>
         </div>
+        ` : ''}
 
         <main>
             ${sectionsHtml}
+            ${nextConsultationDateHtml}
         </main>
 
+        ${includeHeaderFooter ? `
         <footer class="footer">
             <div class="date-area">
                 Date: ${date}
@@ -460,6 +560,7 @@ function buildHtml(data: PdfData): string {
                 <div class="sig-name">${doctorFullName} ${qualifications}</div>
             </div>
         </footer>
+        ` : ''}
     </body>
     </html>
     `;

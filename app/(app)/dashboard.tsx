@@ -37,7 +37,9 @@ export default function DashboardScreen() {
                 onSearchChange={dashboard.setSearchQuery}
                 onSearchClear={dashboard.clearAppointmentsSearch}
                 appointments={dashboard.filteredAppointments}
-                isLoading={dashboard.isLoading}
+                isLoading={dashboard.isAppointmentsLoading}
+                isRefreshing={dashboard.isAppointmentsRefreshing}
+                onRefresh={dashboard.handleRefreshAppointments}
                 onAppointmentPress={dashboard.handleAppointmentPress}
             />
 

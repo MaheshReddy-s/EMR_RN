@@ -47,11 +47,8 @@ export default function FollowUpModal({ visible, onClose, onSkip, onContinue }: 
     const [selectedDate, setSelectedDate] = useState<Date>(new Date());
     const [currentMonth, setCurrentMonth] = useState(new Date());
 
-    const today = useMemo(() => {
-        const d = new Date();
-        d.setHours(0, 0, 0, 0);
-        return d;
-    }, []);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
 
     /**
      * Issue #10: Month navigation for the follow-up calendar.
@@ -81,7 +78,7 @@ export default function FollowUpModal({ visible, onClose, onSkip, onContinue }: 
         const daysInMonth = lastDay.getDate();
         const startDayOfWeek = firstDay.getDay();
 
-        const days: Array<{ date: Date | null; day: number | null }> = [];
+        const days: { date: Date | null; day: number | null }[] = [];
 
         // Pad with empty cells for the start of the month
         for (let i = 0; i < startDayOfWeek; i++) {
@@ -105,6 +102,15 @@ export default function FollowUpModal({ visible, onClose, onSkip, onContinue }: 
     };
 
     const monthLabel = currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
+    const selectedDateAtStartOfDay = new Date(selectedDate);
+    selectedDateAtStartOfDay.setHours(0, 0, 0, 0);
+    const isFutureSelected = selectedDateAtStartOfDay.getTime() > today.getTime();
+
+    const handleContinue = () => {
+        if (!isFutureSelected) return;
+        onContinue(selectedDateAtStartOfDay);
+    };
 
     return (
         <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
@@ -220,9 +226,16 @@ export default function FollowUpModal({ visible, onClose, onSkip, onContinue }: 
                     </View>
 
                     {/* Selected Date Display */}
-                    <Text className="text-center text-gray-500 text-sm mt-3 mb-4">
+                    <Text className="text-center text-gray-500 text-sm mt-3">
                         Selected: {formatDate(selectedDate)}
                     </Text>
+                    {!isFutureSelected ? (
+                        <Text className="text-center text-red-500 text-sm mt-1 mb-4">
+                            Select future date to continue
+                        </Text>
+                    ) : (
+                        <View className="mb-4" />
+                    )}
 
                     {/* Action Buttons */}
                     <View className="flex-row gap-3">
@@ -230,10 +243,13 @@ export default function FollowUpModal({ visible, onClose, onSkip, onContinue }: 
                             <Text className="text-center text-gray-600 font-semibold">Skip</Text>
                         </TouchableOpacity>
                         <TouchableOpacity
-                            onPress={() => onContinue(selectedDate)}
-                            className="flex-1 py-3 rounded-xl bg-[#007AFF]"
+                            onPress={handleContinue}
+                            disabled={!isFutureSelected}
+                            className={`flex-1 py-3 rounded-xl ${isFutureSelected ? 'bg-[#007AFF]' : 'bg-gray-300'}`}
                         >
-                            <Text className="text-center text-white font-semibold">Continue</Text>
+                            <Text className={`text-center font-semibold ${isFutureSelected ? 'text-white' : 'text-gray-500'}`}>
+                                Continue
+                            </Text>
                         </TouchableOpacity>
                     </View>
                 </View>

@@ -1,6 +1,5 @@
 import React from 'react';
 import { Platform, View } from 'react-native';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { DoctorProfileModal } from '@/components/settings/DoctorProfileModal';
 import SettingsContent from '@/features/settings/components/SettingsContent';
 import SettingsSidebar from '@/features/settings/components/SettingsSidebar';
@@ -10,7 +9,7 @@ export default function SettingsScreen() {
     const settings = useSettings();
 
     return (
-        <GestureHandlerRootView style={{ flex: 1 }}>
+        <>
             <View style={Platform.OS === 'web' ? { flex: 1, alignItems: 'center', backgroundColor: 'white' } : { flex: 1 }}>
                 <View className="flex-1 flex-row bg-white" style={Platform.OS === 'web' ? { width: '100%', maxWidth: 960 } : {}}>
                     <SettingsSidebar
@@ -65,6 +64,6 @@ export default function SettingsScreen() {
                 user={settings.doctorUser}
                 onSave={settings.handleDoctorProfileSave}
             />
-        </GestureHandlerRootView>
+        </>
     );
 }

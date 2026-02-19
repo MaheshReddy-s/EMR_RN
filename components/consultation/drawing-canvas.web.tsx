@@ -1,12 +1,12 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { FIXED_CONTENT_WIDTH } from './prescription-row-layout';
+import { API_REFERENCE_WIDTH } from './prescription-row-layout';
 
-const LOGICAL_WIDTH = FIXED_CONTENT_WIDTH;
+const LOGICAL_WIDTH = API_REFERENCE_WIDTH;
 const ERASER_COLOR = '#FFFFFF';
 const ERASER_WIDTH = 20;
 const DEFAULT_PEN_COLOR = '#1a365d';
-const DEFAULT_PEN_WIDTH = 2.5;
+const DEFAULT_PEN_WIDTH = 1.5;
 
 interface Point {
     x: number;
@@ -112,7 +112,7 @@ export default function DrawingCanvas({
                 if (points.length > 0) {
                     loadedPaths.push({ points, color, width });
                 }
-            } catch (e) { }
+            } catch { }
         }
 
         if (loadedPaths.length > 0) {

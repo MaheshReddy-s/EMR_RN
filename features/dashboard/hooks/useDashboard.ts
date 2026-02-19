@@ -7,10 +7,9 @@ import {
     mergeNormalizedPatients,
     normalizePatients,
 } from '@/entities';
-import type { NormalizedPatients } from '@/entities';
+import type { NormalizedPatients, Patient } from '@/entities';
 import { useMemoryDiagnostics } from '@/hooks/useMemoryDiagnostics';
 import { useTenant } from '@/hooks/useTenant';
-import type { Patient } from '@/entities';
 import { AppointmentRepository, PatientRepository } from '@/repositories';
 import { useSessionStore } from '@/stores/session-store';
 import type { Appointment, DashboardTab, MonthDateItem } from '@/features/dashboard/types';
@@ -78,6 +77,8 @@ export function useDashboard() {
     const [hasMorePatients, setHasMorePatients] = useState(true);
     const [isLoading, setIsLoading] = useState(false);
     const [isFetchingMore, setIsFetchingMore] = useState(false);
+    const [isAppointmentsLoading, setIsAppointmentsLoading] = useState(false);
+    const [isAppointmentsRefreshing, setIsAppointmentsRefreshing] = useState(false);
 
     const searchRequestIdRef = useRef(0);
     const hasWarnedPatientCapRef = useRef(false);
@@ -196,10 +197,11 @@ export function useDashboard() {
         }
     }, [doctorId, patientNormalizationOptions]);
 
-    const fetchAppointments = useCallback(async (date: Date) => {
+    const fetchAppointments = useCallback(async (date: Date, options?: { isRefresh?: boolean }) => {
         if (!doctorId) return;
 
-        setIsLoading(true);
+        if (options?.isRefresh) setIsAppointmentsRefreshing(true);
+        else setIsAppointmentsLoading(true);
         try {
             const dateOnly = new Date(date.getFullYear(), date.getMonth(), date.getDate());
             const timestamp = Math.floor(dateOnly.getTime() / 1000);
@@ -233,9 +235,14 @@ export function useDashboard() {
         } catch (e) {
             if (__DEV__) console.error('Failed to fetch appointments:', e);
         } finally {
-            setIsLoading(false);
+            setIsAppointmentsLoading(false);
+            setIsAppointmentsRefreshing(false);
         }
     }, [doctorId]);
+
+    const handleRefreshAppointments = useCallback(() => {
+        fetchAppointments(selectedDate, { isRefresh: true });
+    }, [fetchAppointments, selectedDate]);
 
     const handlePatientSearch = useCallback((text: string) => {
         const requestId = ++searchRequestIdRef.current;
@@ -450,6 +457,9 @@ export function useDashboard() {
         displayedPatients,
         isLoading,
         isFetchingMore,
+        isAppointmentsLoading,
+        isAppointmentsRefreshing,
+        handleRefreshAppointments,
         handleRefreshPatients,
         handleLoadMorePatients,
         handlePatientsMomentumScrollBegin,
