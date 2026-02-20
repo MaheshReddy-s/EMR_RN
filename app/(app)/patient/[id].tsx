@@ -10,7 +10,7 @@ import { useVisitConsultationDetails } from '@/features/patient-detail/hooks/use
 import type { Patient } from '@/entities';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useMemo } from 'react';
-import { ActivityIndicator, Platform, ScrollView, View } from 'react-native';
+import { ActivityIndicator, Platform, View } from 'react-native';
 
 function firstParam(value: string | string[] | undefined): string | undefined {
     if (Array.isArray(value)) return value[0];

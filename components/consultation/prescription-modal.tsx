@@ -4,7 +4,6 @@ import React, { useEffect, useState } from 'react';
 import {
     Modal,
     Pressable,
-    SafeAreaView,
     ScrollView,
     Text,
     TextInput,
@@ -12,10 +11,10 @@ import {
     View
 } from 'react-native';
 import PrescriptionEditModal from './prescription-edit-modal';
+import type { PrescriptionVariant, PrescriptionData } from '@/entities/consultation/types';
 
 // Re-export from centralized entity types for backward compatibility
 export type { PrescriptionVariant, PrescriptionData } from '@/entities/consultation/types';
-import type { PrescriptionVariant, PrescriptionData } from '@/entities/consultation/types';
 
 interface PrescriptionModalProps {
     visible: boolean;

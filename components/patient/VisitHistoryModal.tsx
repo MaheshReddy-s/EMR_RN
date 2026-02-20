@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -18,6 +18,7 @@ import { AuthRepository, PatientRepository } from '@/repositories';
 import { API_BASE_URL, API_ENDPOINTS } from '@/constants/endpoints';
 import * as Sharing from 'expo-sharing';
 import * as Print from 'expo-print';
+import { File, Paths } from 'expo-file-system';
 import { VisitHistory } from '@/entities';
 import { mapPdfHistory, mapConsultationHistory, fetchAndDecryptFile } from '@/shared';
 import { buildConsultationSections, ConsultationDetailSection } from '@/shared/lib/consultation-mapper';
@@ -41,17 +42,64 @@ export function VisitHistoryModal({ visible, onClose, patientId }: VisitHistoryM
     const [rawPayloads, setRawPayloads] = useState<Map<string, any>>(new Map());
     const [sections, setSections] = useState<ConsultationDetailSection[]>([]);
 
-    useEffect(() => {
-        if (visible && patientId) {
-            loadHistory();
-        } else if (!visible) {
-            setDecryptedPdfUri(null);
-            setDecryptedBytes(null);
-            setSelectedVisit(null);
-        }
-    }, [visible, patientId]);
+    const handleVisitSelect = useCallback(async (visit: VisitHistory) => {
+        setSelectedVisit(visit);
+        setIsDecrypting(true);
+        setDecryptedPdfUri(null);
+        setDecryptedBytes(null);
 
-    const loadHistory = async () => {
+        let hasSectionFallback = false;
+        try {
+            // Native Preview Logic: If we have the raw consultation data, build sections
+            const visitId = visit.consultationID || visit.id;
+            const payload = rawPayloads.get(visitId);
+            if (payload) {
+                const mappedSections = buildConsultationSections(payload);
+                hasSectionFallback = mappedSections.length > 0;
+                setSections(mappedSections);
+            } else {
+                setSections([]);
+            }
+
+            // Still fetch and decrypt PDF for Share/Print functionality
+            let pdfPath = '';
+            if (visit.name) {
+                pdfPath = API_ENDPOINTS.CONSULTATION.PDF_DOWNLOAD(visit.name);
+            } else if (visit.link) {
+                pdfPath = visit.link.startsWith('/') ? visit.link : `/${visit.link}`;
+            }
+
+            if (!pdfPath) throw new Error('Invalid report link');
+
+            const fullUrl = `${API_BASE_URL}${pdfPath}`;
+            const result = await fetchAndDecryptFile(fullUrl);
+            if (result) {
+                if (isWeb) {
+                    const blobUrl = URL.createObjectURL(result.blob!);
+                    setDecryptedPdfUri(blobUrl);
+                } else {
+                    const fileName = `Report_${visit.id}.pdf`;
+                    const file = new File(Paths.cache, fileName);
+                    file.write(result.bytes);
+
+                    setDecryptedPdfUri(file.uri);
+                    console.log('Android PDF URI:', file.uri);
+
+                }
+                setDecryptedBytes(result.bytes);
+            }
+        } catch (error: any) {
+            if (__DEV__) console.error('Decryption failed:', error);
+            // Don't alert if we have sections to show as a fallback
+            if (!hasSectionFallback) {
+                Alert.alert('Error', error.message || 'Failed to decrypt the report.');
+            }
+        } finally {
+            setIsDecrypting(false);
+        }
+    }, [isWeb, rawPayloads]);
+
+    const loadHistory = useCallback(async () => {
         setIsLoading(true);
         try {
             await AuthRepository.restoreSession();
@@ -60,7 +108,7 @@ export function VisitHistoryModal({ visible, onClose, patientId }: VisitHistoryM
 
             const consultations = Array.isArray(historyData)
                 ? historyData
-                : ((historyData as Record<string, unknown>)?.data as Array<Record<string, unknown>>) || [];
+                : ((historyData as Record<string, unknown>)?.data as Record<string, unknown>[]) || [];
 
             const latestConsultation = consultations[0] as Record<string, unknown> | undefined;
             const fromConsultations = mapConsultationHistory(consultations);
@@ -105,7 +153,7 @@ export function VisitHistoryModal({ visible, onClose, patientId }: VisitHistoryM
 
             setHistory(finalHistory);
             if (finalHistory.length > 0) {
-                handleVisitSelect(finalHistory[0]);
+                void handleVisitSelect(finalHistory[0]);
             }
         } catch (error) {
             if (__DEV__) console.error('Failed to load history:', error);
@@ -113,63 +161,17 @@ export function VisitHistoryModal({ visible, onClose, patientId }: VisitHistoryM
         } finally {
             setIsLoading(false);
         }
-    };
+    }, [handleVisitSelect, patientId]);
 
-    const handleVisitSelect = async (visit: VisitHistory) => {
-        setSelectedVisit(visit);
-        setIsDecrypting(true);
-        setDecryptedPdfUri(null);
-        setDecryptedBytes(null);
-
-        try {
-            // Native Preview Logic: If we have the raw consultation data, build sections
-            const visitId = visit.consultationID || visit.id;
-            const payload = rawPayloads.get(visitId);
-            if (payload) {
-                const mappedSections = buildConsultationSections(payload);
-                setSections(mappedSections);
-            } else {
-                setSections([]);
-            }
-
-            // Still fetch and decrypt PDF for Share/Print functionality
-            let pdfPath = '';
-            if (visit.name) {
-                pdfPath = API_ENDPOINTS.CONSULTATION.PDF_DOWNLOAD(visit.name);
-            } else if (visit.link) {
-                pdfPath = visit.link.startsWith('/') ? visit.link : `/${visit.link}`;
-            }
-
-            if (!pdfPath) throw new Error('Invalid report link');
-
-            const fullUrl = `${API_BASE_URL}${pdfPath}`;
-            const result = await fetchAndDecryptFile(fullUrl);
-            if (result) {
-                if (isWeb) {
-                    const blobUrl = URL.createObjectURL(result.blob!);
-                    setDecryptedPdfUri(blobUrl);
-                } else {
-                    const { Paths, File } = require('expo-file-system');
-                    const fileName = `Report_${visit.id}.pdf`;
-                    const file = new File(Paths.cache, fileName);
-                    file.write(result.bytes);
-
-                    setDecryptedPdfUri(file.uri);
-                    console.log('Android PDF URI:', file.uri);
-
-                }
-                setDecryptedBytes(result.bytes);
-            }
-        } catch (error: any) {
-            if (__DEV__) console.error('Decryption failed:', error);
-            // Don't alert if we have sections to show as a fallback
-            if (sections.length === 0) {
-                Alert.alert('Error', error.message || 'Failed to decrypt the report.');
-            }
-        } finally {
-            setIsDecrypting(false);
+    useEffect(() => {
+        if (visible && patientId) {
+            void loadHistory();
+        } else if (!visible) {
+            setDecryptedPdfUri(null);
+            setDecryptedBytes(null);
+            setSelectedVisit(null);
         }
-    };
+    }, [loadHistory, patientId, visible]);
 
 
 
@@ -196,7 +198,7 @@ export function VisitHistoryModal({ visible, onClose, patientId }: VisitHistoryM
                     });
                 }
             }
-        } catch (error) {
+        } catch {
             Alert.alert('Error', 'Share failed');
         }
     };

@@ -1,4 +1,4 @@
-import { HEADER_ICONS, CONSULTATION_ICONS } from '@/constants/icons';
+import { HEADER_ICONS } from '@/constants/icons';
 import { Icon } from '@/components/ui/Icon';
 import { Text, TouchableOpacity, View } from 'react-native';
 

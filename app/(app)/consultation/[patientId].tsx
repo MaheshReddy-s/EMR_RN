@@ -1,5 +1,5 @@
 import React, { useCallback, useRef, useState } from 'react';
-import { Alert, Platform, ScrollView, View } from 'react-native';
+import { Alert, Platform, ScrollView } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { EditProfileModal } from '@/components/patient/EditProfileModal';
 import type { PdfFilterRenderOptions } from '@/components/consultation/pdf-filter-modal';
@@ -38,7 +38,7 @@ const SECTION_LABELS: Record<TabType, string> = {
     notes: 'Notes',
 };
 
-const SECTION_SETTINGS_KEYS: Array<{ id: string; key: string }> = [
+const SECTION_SETTINGS_KEYS: { id: string; key: string }[] = [
     { id: 'complaints', key: 'complaints' },
     { id: 'diagnosis', key: 'diagnosis' },
     { id: 'examination', key: 'examination' },
@@ -189,7 +189,7 @@ export default function ConsultationScreen() {
                 }
             });
         }
-    }, [isLoadingPatient, latestConsultation, patientId, restoreDraft]);
+    }, [consultation, isLoadingPatient, latestConsultation, patientId, restoreDraft]);
 
     const { suggestions, isLoadingSuggestions, onSuggestionSelect,refreshSuggestions } = useConsultationSuggestions({
         activeTab,
@@ -422,7 +422,7 @@ export default function ConsultationScreen() {
                             const category = activeTab as any; // Cast for now, service handles checking
                             await MasterDataRepository.deleteItem(category, suggestion.id);
                             await refreshSuggestions();
-                        } catch (error) {
+                        } catch {
                             Alert.alert('Error', 'Failed to delete property');
                         }
                     }
@@ -446,7 +446,7 @@ export default function ConsultationScreen() {
                 const category = activeTab as any;
                 await MasterDataRepository.updateItem(category, editingPropertySuggestion.id, editModalText);
                 await refreshSuggestions();
-            } catch (error) {
+            } catch {
                 Alert.alert('Error', 'Failed to update property');
             }
         } else if (editingItem) {
@@ -458,7 +458,7 @@ export default function ConsultationScreen() {
                 const category = activeTab as any;
                 await MasterDataRepository.addItem(category, editModalText);
                 await refreshSuggestions();
-            } catch (error) {
+            } catch {
                 Alert.alert('Error', 'Failed to add property');
             }
         } else {

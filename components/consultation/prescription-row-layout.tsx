@@ -32,7 +32,6 @@ interface PrescriptionRowLayoutProps {
     onDelete: () => void;
     onClear: () => void;
     onEdit?: () => void;
-    canClear: boolean;
     showIndex?: boolean;
     isFullWidth?: boolean;
     style?: any;
@@ -48,7 +47,6 @@ export default function PrescriptionRowLayout({
     onClear,
     onEdit,
     isFullWidth,
-    canClear,
     showIndex = false,
     style
 }: PrescriptionRowLayoutProps) {

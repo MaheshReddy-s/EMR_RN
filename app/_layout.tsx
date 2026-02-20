@@ -3,24 +3,22 @@ import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState } from 'react';
 import { Platform, View } from 'react-native';
-import 'react-native-gesture-handler';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import 'react-native-reanimated';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import 'react-native-get-random-values';
 import { polyfillWebCrypto } from 'expo-standard-web-crypto';
-import "../global.css";
-
-// Polyfill Web Crypto for Native
-if (Platform.OS !== 'web') {
-  polyfillWebCrypto();
-}
-
 import ErrorBoundary from '@/components/error-boundary';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { AuthRepository, RuntimeRepository } from '@/repositories';
 import { OfflinePdfUploadQueue } from '@/services/offline-pdf-upload-queue';
 import { setErrorReporter } from '@/shared/lib/error-reporter';
+import '../global.css';
+
+// Polyfill Web Crypto for Native
+if (Platform.OS !== 'web') {
+  polyfillWebCrypto();
+}
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();

@@ -35,10 +35,10 @@ export default function PrintPreviewModal({
                 await PdfService.createPdf(pdfData, pdfData?.__renderOptions);
             } else {
                 // For native, we use expo-print to actually trigger the printer
-                const Print = require('expo-print');
+                const Print = await import('expo-print');
                 await Print.printAsync({ html: htmlContent });
             }
-        } catch (error) {
+        } catch {
             Alert.alert('Print Error', 'Failed to initiate printing');
         }
     };

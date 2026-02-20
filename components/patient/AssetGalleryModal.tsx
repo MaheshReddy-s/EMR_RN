@@ -158,7 +158,7 @@ const ZoomableSecureImage = ({ asset, style }: { asset: Asset, style: any }) => 
                         setLoading(false);
                     }
                 }
-            } catch (e) {
+            } catch {
                 if (isMounted) setLoading(false);
             }
         };

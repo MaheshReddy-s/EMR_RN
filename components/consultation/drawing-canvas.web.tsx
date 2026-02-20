@@ -26,19 +26,12 @@ export interface StrokeData {
 }
 
 interface DrawingCanvasProps {
-    index: number;
-    prescription: any;
-    onExpand?: () => void;
-    onDelete?: () => void;
+    prescription?: any;
     onStrokesChange?: (strokes: StrokeData[]) => void;
     initialDrawings?: StrokeData[];
     penColor: string;
     penThickness: number;
     isErasing: boolean;
-    canvasRef?: React.RefObject<any>;
-    onEdit?: () => void;
-    showIndex?: boolean;
-    canvasOnly?: boolean;
 }
 
 function pointsToSvgPath(points: Point[]): string {
@@ -67,19 +60,12 @@ function svgPathToPoints(svgPath: string): Point[] {
 }
 
 export default function DrawingCanvas({
-    index,
     prescription,
-    onExpand,
-    onDelete,
     onStrokesChange,
     initialDrawings,
     penColor,
     penThickness,
     isErasing,
-    canvasRef,
-    onEdit,
-    showIndex = false,
-    canvasOnly = false
 }: DrawingCanvasProps) {
     const internalCanvasRef = useRef<HTMLCanvasElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);

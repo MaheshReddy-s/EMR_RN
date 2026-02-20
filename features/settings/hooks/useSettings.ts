@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { User } from '@/entities';
@@ -12,7 +12,6 @@ import { api } from '@/lib/api-client';
 import { API_ENDPOINTS } from '@/constants/endpoints';
 import type { PrescriptionData, PrescriptionVariant } from '@/entities/consultation/types';
 import {
-    CONSULTATION_SETTINGS_DATA,
     INITIAL_SECTIONS_ORDER,
     LIST_SECTIONS,
     SECTION_MAPPING,

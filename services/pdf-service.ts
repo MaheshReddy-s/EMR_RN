@@ -19,7 +19,6 @@ import { Platform } from 'react-native';
 import { File as FSFile, Paths } from 'expo-file-system';
 import { AuthRepository } from '@/repositories';
 import { getDecryptedMasterKey, encryptAesGcm } from '@/shared/lib/crypto-service';
-import CryptoJS from 'crypto-js';
 
 /**
  * PdfService
@@ -172,16 +171,7 @@ export const PdfService = {
             // 4. Encrypt with AES-GCM
             const encryptedBytes = await encryptAesGcm(bytesRaw, masterKeyBytes);
 
-            // 5. Convert to Base64 of the ENCRYPTED payload (IV + Ciphertext)
-            // Backend expects the base64 of the raw encrypted binary
-            let binary = '';
-            const len = encryptedBytes.byteLength;
-            for (let i = 0; i < len; i++) {
-                binary += String.fromCharCode(encryptedBytes[i]);
-            }
-            const encryptedBase64 = btoa(binary);
-
-            // 6. Save encrypted binary to temp file
+            // 5. Save encrypted binary to temp file
             const encryptedFileName = `encrypted_consultation_${Date.now()}.pdf`;
             const encryptedFile = new FSFile(Paths.cache, encryptedFileName);
             await encryptedFile.write(encryptedBytes);

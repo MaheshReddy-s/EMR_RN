@@ -13,10 +13,10 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import type { PrescriptionVariant, PrescriptionData } from '@/entities/consultation/types';
 
 // Re-export from centralized entity types for backward compatibility
 export type { PrescriptionVariant, PrescriptionData } from '@/entities/consultation/types';
-import type { PrescriptionVariant, PrescriptionData } from '@/entities/consultation/types';
 
 interface PrescriptionEditModalProps {
     visible: boolean;

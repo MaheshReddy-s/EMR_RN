@@ -47,7 +47,7 @@ export const Icon = ({ icon, library: libProp, ios, android, size = 24, color, s
                     weight={weight}
                 />
             );
-        } catch (e) {
+        } catch {
             // Fallback to a safe material icon if SFSymbol fails
             return <MaterialCommunityIcons name="help-circle" size={size} color={color} style={style} />;
         }

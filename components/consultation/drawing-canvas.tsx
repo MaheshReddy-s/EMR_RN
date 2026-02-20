@@ -1,6 +1,6 @@
 import { Canvas, Path, Skia, SkPath, notifyChange } from "@shopify/react-native-skia";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { StyleSheet, View, Platform } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS, useSharedValue } from 'react-native-reanimated';
 import PrescriptionRowLayout, {
@@ -264,8 +264,8 @@ function DrawingCanvasComponent({
         hasUserDrawnRef.current = false;
         clearLiveAfterCommitRef.current = false;
         strokeIdRef.current = 0;
-        previousInitialCountRef.current = initialDrawings?.length ?? 0;
-        previousScaleRef.current = displayScale > 0 ? displayScale : 1;
+        previousInitialCountRef.current = 0;
+        previousScaleRef.current = 1;
         setStrokes([]);
         resetLiveStroke();
         setDrawingActive(false);
@@ -422,7 +422,6 @@ function DrawingCanvasComponent({
             onDelete={onDelete || (() => { })}
             onClear={handleClear}
             onEdit={onEdit}
-            canClear={strokes.length > 0}
             showIndex={showIndex}
             isFullWidth={isFullWidth}
         />
