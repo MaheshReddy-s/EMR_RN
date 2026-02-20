@@ -39,7 +39,7 @@ export type {
     ConsultationState,
 } from './consultation/types';
 
-export { SECTION_KEYS } from './consultation/types';
+export { CONSULTATION_SECTION_KEYS, SECTION_KEYS } from './consultation/types';
 
 // Appointment
 export type {

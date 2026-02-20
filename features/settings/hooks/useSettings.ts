@@ -10,148 +10,23 @@ import { APP_ERROR_CODES, AppError } from '@/shared';
 import { useSessionStore } from '@/stores/session-store';
 import { api } from '@/lib/api-client';
 import { API_ENDPOINTS } from '@/constants/endpoints';
-import type { PrescriptionData, PrescriptionVariant } from '@/entities/consultation/types';
+import type { PrescriptionData } from '@/entities/consultation/types';
 import {
     INITIAL_SECTIONS_ORDER,
     LIST_SECTIONS,
     SECTION_MAPPING,
 } from '@/features/settings/constants';
 import type { AdvancedSettings, ListItem, SettingSection } from '@/features/settings/types';
-
-const SECTION_LABEL_MAP: Record<string, string> = {
-    complaints: 'Complaints',
-    diagnosis: 'Diagnosis',
-    examination: 'Examination',
-    instruction: 'Instruction',
-    investigation: 'Investigation',
-    notes: 'Notes',
-    prescriptions: 'Prescriptions',
-    procedure: 'Procedure',
-    vitals: 'Vitals',
-};
-
-const ALL_SECTION_KEYS = Object.keys(SECTION_LABEL_MAP);
-const TIMING_LETTERS = ['M', 'A', 'E', 'N'] as const;
-const MIN_PENCIL_THICKNESS = 1;
-const MAX_PENCIL_THICKNESS = 50;
-
-function normalizePencilThickness(value: unknown): number {
-    const parsed = Number(value);
-    if (!Number.isFinite(parsed)) return MIN_PENCIL_THICKNESS;
-    return Math.max(MIN_PENCIL_THICKNESS, Math.min(MAX_PENCIL_THICKNESS, Math.round(parsed)));
-}
-
-function normalizeTimings(rawValue: unknown): string {
-    const raw = typeof rawValue === 'number'
-        ? String(rawValue)
-        : (typeof rawValue === 'string' ? rawValue : '');
-
-    const source = raw.trim().toUpperCase();
-    if (!source) return 'M-A-E-N';
-
-    const parts = source.split('-');
-    if (parts.length === 4) {
-        return parts.map((part, index) => {
-            const value = part.trim();
-            const slot = TIMING_LETTERS[index];
-            if (value === slot || value === '1') return slot;
-            if (value === '0' || value === 'O' || value === '' || value === '-') return '-';
-            return TIMING_LETTERS.includes(value as any) ? value : '-';
-        }).join('-');
-    }
-
-    if (/^[01]{4}$/.test(source)) {
-        return source
-            .split('')
-            .map((value, index) => (value === '1' ? TIMING_LETTERS[index] : '-'))
-            .join('-');
-    }
-
-    return TIMING_LETTERS
-        .map((slot) => (source.includes(slot) ? slot : '-'))
-        .join('-');
-}
-
-function mapVariantToModal(rawVariant: Record<string, any>, index: number): PrescriptionVariant {
-    const quantity = rawVariant.quantity !== undefined && rawVariant.quantity !== null
-        ? String(rawVariant.quantity).trim()
-        : '';
-    const units = typeof rawVariant.units === 'string' ? rawVariant.units.trim() : '';
-
-    let dosage = typeof rawVariant.dosage === 'string' ? rawVariant.dosage : '';
-    if (!dosage && quantity) {
-        dosage = `${quantity}${units && units !== 'N/A' ? ` ${units}` : ''}`.trim();
-    }
-    if (!dosage) dosage = 'N/A';
-
-    const rawDuration = rawVariant.duration !== undefined && rawVariant.duration !== null
-        ? String(rawVariant.duration).trim()
-        : '';
-    const duration = rawDuration && /^\d+$/.test(rawDuration)
-        ? `${rawDuration} Days`
-        : (rawDuration || '15 Days');
-
-    return {
-        id: String(rawVariant.variant_id || rawVariant._id || rawVariant.id || `${Date.now()}-${index}`),
-        timings: normalizeTimings(rawVariant.timings || rawVariant.frequency || rawVariant.time),
-        dosage,
-        duration,
-        type: String(rawVariant.medicine_type || rawVariant.type || 'Tablet'),
-        instructions: typeof rawVariant.instructions === 'string' ? rawVariant.instructions : '',
-        purchaseCount: typeof rawVariant.purchaseCount === 'string'
-            ? rawVariant.purchaseCount
-            : (typeof rawVariant.purchase_count === 'string' ? rawVariant.purchase_count : undefined),
-    };
-}
-
-function mapItemToPrescriptionData(item: MasterDataItem): PrescriptionData {
-    const rawData = item.fullData || {};
-    const rawVariants = Array.isArray(rawData.variants) ? rawData.variants : [];
-
-    return {
-        brandName: typeof rawData.brand_name === 'string' && rawData.brand_name.trim()
-            ? rawData.brand_name
-            : item.name,
-        genericName: typeof rawData.generic_name === 'string' ? rawData.generic_name : '',
-        variants: rawVariants.length > 0
-            ? rawVariants
-                .filter((variant): variant is Record<string, any> => typeof variant === 'object' && variant !== null)
-                .map((variant, index) => mapVariantToModal(variant, index))
-            : [{
-                id: Date.now().toString(),
-                timings: 'M-A-E-N',
-                dosage: 'N/A',
-                duration: '15 Days',
-                type: 'Tablet',
-            }],
-    };
-}
-
-function isPrescriptionData(value: unknown): value is PrescriptionData {
-    if (typeof value !== 'object' || value === null) return false;
-    return typeof (value as PrescriptionData).brandName === 'string' &&
-        Array.isArray((value as PrescriptionData).variants);
-}
-
-function toPrescriptionPayload(value: PrescriptionData): Record<string, any> {
-    return {
-        medicine_name: value.brandName,
-        brand_name: value.brandName,
-        generic_name: value.genericName,
-        variants: value.variants.map((variant) => ({
-            ...variant,
-            variant_id: variant.id,
-            timings: variant.timings,
-            dosage: variant.dosage,
-            duration: variant.duration,
-            type: variant.type,
-            medicine_type: variant.type,
-            instructions: variant.instructions,
-            purchaseCount: variant.purchaseCount,
-            purchase_count: variant.purchaseCount,
-        })),
-    };
-}
+import {
+    buildSectionsOrder,
+    buildSettingsPayload,
+    createDefaultAdvancedSettings,
+    isPrescriptionData,
+    mapAdvancedSettings,
+    mapItemToPrescriptionData,
+    normalizePencilThickness,
+    toPrescriptionPayload,
+} from '@/features/settings/utils/settings-utils';
 
 export function useSettings() {
     const router = useRouter();
@@ -176,28 +51,7 @@ export function useSettings() {
 
     const [sectionsOrder, setSectionsOrder] = useState<ListItem[]>(INITIAL_SECTIONS_ORDER);
     const settingsLoadedRef = useRef(false);
-    const [advancedSettings, setAdvancedSettings] = useState<AdvancedSettings>({
-        pencil_thickness: MIN_PENCIL_THICKNESS,
-        top_space: 110,
-        bottom_space: 30,
-        left_space: 70,
-        right_space: 70,
-        followup_window: 0,
-        slot_duration: 15,
-        doctor_details_in_consultation: true,
-        patient_details_in_consultation: true,
-        letterpad_header: true,
-        letterpad_footer: false,
-        complaints: true,
-        diagnosis: true,
-        examination: true,
-        investigation: true,
-        procedure: true,
-        instruction: true,
-        notes: true,
-        prescriptions: true,
-        numbers_for_prescriptions: true,
-    });
+    const [advancedSettings, setAdvancedSettings] = useState<AdvancedSettings>(createDefaultAdvancedSettings);
     const [originalAdvancedSettings, setOriginalAdvancedSettings] = useState<AdvancedSettings | null>(null);
     const [isSavingAdvancedSettings, setIsSavingAdvancedSettings] = useState(false);
 
@@ -241,58 +95,10 @@ export function useSettings() {
             console.log('[Settings] GET response:', JSON.stringify(settings, null, 2));
 
             if (!settings) return;
-
-            const sequence: string[] = Array.isArray(settings.sections_sequence)
-                ? settings.sections_sequence
-                : ALL_SECTION_KEYS;
-
-            const remaining = new Set<string>(ALL_SECTION_KEYS);
-            const ordered: ListItem[] = [];
-
-            for (const key of sequence) {
-                if (remaining.has(key)) {
-                    ordered.push({
-                        id: `section-${key}`,
-                        label: SECTION_LABEL_MAP[key] || key,
-                        key,
-                        enabled: settings[key] !== false,
-                    });
-                    remaining.delete(key);
-                }
-            }
-            for (const key of remaining) {
-                ordered.push({
-                    id: `section-${key}`,
-                    label: SECTION_LABEL_MAP[key] || key,
-                    key,
-                    enabled: settings[key] !== false,
-                });
-            }
-
+            const ordered = buildSectionsOrder(settings);
             setSectionsOrder(ordered);
 
-            const fetchedAdvanced: AdvancedSettings = {
-                pencil_thickness: normalizePencilThickness(settings.pencil_thickness),
-                top_space: settings.top_space ?? 110,
-                bottom_space: settings.bottom_space ?? 30,
-                left_space: settings.left_space ?? 70,
-                right_space: settings.right_space ?? 70,
-                followup_window: settings.followup_window ?? 0,
-                slot_duration: settings.slot_duration ?? 15,
-                doctor_details_in_consultation: settings.doctor_details_in_consultation ?? true,
-                patient_details_in_consultation: settings.patient_details_in_consultation ?? true,
-                letterpad_header: settings.letterpad_header ?? true,
-                letterpad_footer: settings.letterpad_footer ?? false,
-                complaints: settings.complaints ?? true,
-                diagnosis: settings.diagnosis ?? true,
-                examination: settings.examination ?? true,
-                investigation: settings.investigation ?? true,
-                procedure: settings.procedure ?? true,
-                instruction: settings.instruction ?? true,
-                notes: settings.notes ?? true,
-                prescriptions: settings.prescriptions ?? true,
-                numbers_for_prescriptions: settings.numbers_for_prescriptions ?? true,
-            };
+            const fetchedAdvanced = mapAdvancedSettings(settings);
             setAdvancedSettings(fetchedAdvanced);
             setOriginalAdvancedSettings(fetchedAdvanced);
 
@@ -311,16 +117,7 @@ export function useSettings() {
         if (!clinicId || !doctorId) return;
         try {
             const url = API_ENDPOINTS.SETTINGS.UPDATE(clinicId, doctorId);
-            const current = advancedSettings;
-            const payload: Record<string, any> = {
-                ...current,
-                ...updates,
-                sections_sequence: sectionsOrder.map(s => s.key),
-            };
-            // Map section toggles
-            for (const s of sectionsOrder) {
-                payload[s.key] = s.enabled;
-            }
+            const payload = buildSettingsPayload(advancedSettings, sectionsOrder, updates);
             console.log('[Settings] Syncing settings:', JSON.stringify(payload, null, 2));
             await api.put(url, payload);
         } catch (error) {
@@ -332,13 +129,7 @@ export function useSettings() {
         if (!clinicId || !doctorId) return;
         try {
             const url = API_ENDPOINTS.SETTINGS.UPDATE(clinicId, doctorId);
-            const payload: Record<string, any> = {
-                ...advancedSettings,
-                sections_sequence: sections.map(s => s.key),
-            };
-            for (const s of sections) {
-                payload[s.key] = s.enabled;
-            }
+            const payload = buildSettingsPayload(advancedSettings, sections);
             console.log('[Settings] Save Sections payload:', JSON.stringify(payload, null, 2));
             await api.put(url, payload);
         } catch (error) {
@@ -381,15 +172,7 @@ export function useSettings() {
         setIsSavingAdvancedSettings(true);
         try {
             const url = API_ENDPOINTS.SETTINGS.UPDATE(clinicId, doctorId);
-
-            // Construct full payload to avoid overwriting sections order/toggles
-            const payload: Record<string, any> = {
-                ...advancedSettings,
-                sections_sequence: sectionsOrder.map(s => s.key),
-            };
-            for (const s of sectionsOrder) {
-                payload[s.key] = s.enabled;
-            }
+            const payload = buildSettingsPayload(advancedSettings, sectionsOrder);
 
             console.log('[Settings] Save Advanced payload:', JSON.stringify(payload, null, 2));
             await api.put(url, payload);

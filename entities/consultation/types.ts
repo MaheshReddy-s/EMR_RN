@@ -124,6 +124,18 @@ export type TabType =
     | 'instruction'
     | 'notes';
 
+/** Ordered section keys used across consultation flows (rendering, drafts, mapping). */
+export const CONSULTATION_SECTION_KEYS: TabType[] = [
+    'complaints',
+    'diagnosis',
+    'examination',
+    'investigation',
+    'procedure',
+    'prescriptions',
+    'instruction',
+    'notes',
+];
+
 export interface ConsultationState {
     complaints: ConsultationItem[];
     diagnosis: ConsultationItem[];

@@ -1,9 +1,15 @@
 import { useCallback, useEffect, useReducer, useRef } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
-import { ConsultationItem, StrokeData, ConsultationState, TabType } from '@/entities/consultation/types';
+import {
+    ConsultationItem,
+    StrokeData,
+    ConsultationState,
+    TabType,
+} from '@/entities/consultation/types';
 
 // Re-export for backward compatibility
 export type { TabType, ConsultationState } from '@/entities/consultation/types';
+export { CONSULTATION_SECTION_KEYS as SECTION_KEYS } from '@/entities/consultation/types';
 
 // ─── CONFIGURATION ───────────────────────────────────────────
 /** Maximum strokes per consultation item (prevents unbounded memory growth) */
@@ -35,12 +41,6 @@ const initialState: ConsultationState = {
     sessionStartTime: Date.now(),
     elapsedTime: '00:00:00',
 };
-
-// ─── SECTION KEYS (for iteration) ───────────────────────────
-export const SECTION_KEYS: TabType[] = [
-    'complaints', 'diagnosis', 'examination', 'investigation',
-    'procedure', 'prescriptions', 'instruction', 'notes',
-];
 
 function formatElapsedTime(elapsedMs: number): string {
     const safeElapsed = Math.max(0, elapsedMs);

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -22,6 +22,12 @@ import { File, Paths } from 'expo-file-system';
 import { VisitHistory } from '@/entities';
 import { mapPdfHistory, mapConsultationHistory, fetchAndDecryptFile } from '@/shared';
 import { buildConsultationSections, ConsultationDetailSection } from '@/shared/lib/consultation-mapper';
+import {
+    buildRawPayloadMap,
+    extractConsultations,
+    extractPdfHistory,
+    mergeVisitHistory,
+} from './visit-history-modal.utils';
 
 interface VisitHistoryModalProps {
     visible: boolean;
@@ -39,7 +45,7 @@ export function VisitHistoryModal({ visible, onClose, patientId }: VisitHistoryM
     const [selectedVisit, setSelectedVisit] = useState<VisitHistory | null>(null);
     const [decryptedPdfUri, setDecryptedPdfUri] = useState<string | null>(null);
     const [decryptedBytes, setDecryptedBytes] = useState<Uint8Array | null>(null);
-    const [rawPayloads, setRawPayloads] = useState<Map<string, any>>(new Map());
+    const rawPayloadsRef = useRef<Map<string, any>>(new Map());
     const [sections, setSections] = useState<ConsultationDetailSection[]>([]);
 
     const handleVisitSelect = useCallback(async (visit: VisitHistory) => {
@@ -52,7 +58,7 @@ export function VisitHistoryModal({ visible, onClose, patientId }: VisitHistoryM
         try {
             // Native Preview Logic: If we have the raw consultation data, build sections
             const visitId = visit.consultationID || visit.id;
-            const payload = rawPayloads.get(visitId);
+            const payload = rawPayloadsRef.current.get(visitId);
             if (payload) {
                 const mappedSections = buildConsultationSections(payload);
                 hasSectionFallback = mappedSections.length > 0;
@@ -97,7 +103,7 @@ export function VisitHistoryModal({ visible, onClose, patientId }: VisitHistoryM
         } finally {
             setIsDecrypting(false);
         }
-    }, [isWeb, rawPayloads]);
+    }, [isWeb]);
 
     const loadHistory = useCallback(async () => {
         setIsLoading(true);
@@ -105,51 +111,15 @@ export function VisitHistoryModal({ visible, onClose, patientId }: VisitHistoryM
             await AuthRepository.restoreSession();
 
             const historyData = await PatientRepository.getPatientHistory(patientId);
-
-            const consultations = Array.isArray(historyData)
-                ? historyData
-                : ((historyData as Record<string, unknown>)?.data as Record<string, unknown>[]) || [];
-
-            const latestConsultation = consultations[0] as Record<string, unknown> | undefined;
+            const consultations = extractConsultations(historyData);
+            const latestConsultation = consultations[0];
             const fromConsultations = mapConsultationHistory(consultations);
-            let pdfHist: any[] = [];
-
-            if (Array.isArray((historyData as any)?.pdf_history)) {
-                pdfHist = (historyData as any).pdf_history;
-            } else if (latestConsultation && Array.isArray(latestConsultation.pdf_history)) {
-                pdfHist = latestConsultation.pdf_history;
-            }
+            const pdfHist = extractPdfHistory(historyData, latestConsultation);
             const fromPdfs = mapPdfHistory(pdfHist);
-
-            // Merge and deduplicate
-            const combinedMap = new Map<string, VisitHistory>();
-            fromPdfs.forEach(item => {
-                const key = item.link || item.id;
-                combinedMap.set(key, item);
-            });
-            fromConsultations.forEach(item => {
-                const key = item.consultationID || item.id;
-                const existing = combinedMap.get(key);
-                if (existing) {
-                    combinedMap.set(key, { ...item, link: existing.link || item.link });
-                } else {
-                    combinedMap.set(key, item);
-                }
-            });
-
-            const finalHistory = Array.from(combinedMap.values()).sort((a, b) => {
-                const valA = a.consultationID || a.id;
-                const valB = b.consultationID || b.id;
-                return valB.localeCompare(valA);
-            });
+            const finalHistory = mergeVisitHistory(fromConsultations, fromPdfs);
 
             // Store raw payloads for native preview
-            const payloadsMap = new Map<string, any>();
-            consultations.forEach(c => {
-                const id = c._id || c.consultation_id || c.id;
-                if (id) payloadsMap.set(String(id), c);
-            });
-            setRawPayloads(payloadsMap);
+            rawPayloadsRef.current = buildRawPayloadMap(consultations);
 
             setHistory(finalHistory);
             if (finalHistory.length > 0) {

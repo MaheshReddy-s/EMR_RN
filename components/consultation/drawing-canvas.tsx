@@ -93,13 +93,13 @@ function DrawingCanvasComponent({
     const localCanvasRef = useRef<View>(null);
     const effectiveCanvasRef = canvasRef || localCanvasRef;
 
-    const hasUserDrawnRef = useRef(false);
     const initialLoadDoneRef = useRef(false);
     const drawingActiveRef = useRef(false);
     const previousScaleRef = useRef(1);
     const clearLiveAfterCommitRef = useRef(false);
     const strokeIdRef = useRef(0);
     const previousInitialCountRef = useRef(initialDrawings?.length ?? 0);
+    const serializedStrokesRef = useRef<StrokeData[]>([]);
 
     const effectiveLogicalWidth = prescription?.referenceWidth || LOGICAL_WIDTH;
     const displayScale = canvasWidth > 0 ? canvasWidth / effectiveLogicalWidth : 1;
@@ -118,6 +118,10 @@ function DrawingCanvasComponent({
         onDrawingActive?.(active);
     }, [onDrawingActive]);
 
+    const emitStrokesChange = useCallback((nextStrokes: StrokeData[]) => {
+        onStrokesChangeRef.current?.(nextStrokes);
+    }, []);
+
     const resetLiveStroke = useCallback(() => {
         // Only used on unmount / clear — not on every commit
         livePath.value = Skia.Path.Make();
@@ -125,8 +129,19 @@ function DrawingCanvasComponent({
         isDrawing.value = false;
     }, [isDrawing, livePath]);
 
-    const commitStrokeDirect = useCallback((path: SkPath, color: string, width: number, blendMode: BlendMode) => {
-        hasUserDrawnRef.current = true;
+    // Save each committed stroke once in logical space to avoid O(n) re-serialization per draw.
+    const commitStrokeDirect = useCallback((
+        path: SkPath,
+        color: string,
+        width: number,
+        blendMode: BlendMode,
+        scaleAtCommit: number
+    ) => {
+        const safeScale = scaleAtCommit > 0 ? scaleAtCommit : 1;
+        const logicalPath = safeScale === 1 ? path.copy() : scaledPathCopy(path, 1 / safeScale);
+        const svg = logicalPath.toSVGString();
+        if (!svg) return;
+
         clearLiveAfterCommitRef.current = true;
         setStrokes((prev) => [...prev, {
             id: `stroke-${strokeIdRef.current++}`,
@@ -135,7 +150,16 @@ function DrawingCanvasComponent({
             width,
             blendMode,
         }]);
-    }, []);
+
+        const nextSerialized = serializedStrokesRef.current.concat({
+            svg,
+            color,
+            width: width / safeScale,
+            blendMode,
+        });
+        serializedStrokesRef.current = nextSerialized;
+        emitStrokesChange(nextSerialized);
+    }, [emitStrokesChange]);
 
     // Stylus-only input:
     // - pointerType === 1 is stylus in RNGH on native.
@@ -186,7 +210,13 @@ function DrawingCanvasComponent({
 
             // Copy before potential next gesture overwrites it
             const pathCopy = livePath.value.copy();
-            runOnJS(commitStrokeDirect)(pathCopy, liveColor.value, liveWidth.value, liveBlendMode.value);
+            runOnJS(commitStrokeDirect)(
+                pathCopy,
+                liveColor.value,
+                liveWidth.value,
+                liveBlendMode.value,
+                displayScale
+            );
 
             isDrawing.value = false;
             if (shouldNotifyDrawingActive) {
@@ -196,7 +226,13 @@ function DrawingCanvasComponent({
         .onFinalize(() => {
             if (isDrawing.value) {
                 const pathCopy = livePath.value.copy();
-                runOnJS(commitStrokeDirect)(pathCopy, liveColor.value, liveWidth.value, liveBlendMode.value);
+                runOnJS(commitStrokeDirect)(
+                    pathCopy,
+                    liveColor.value,
+                    liveWidth.value,
+                    liveBlendMode.value,
+                    displayScale
+                );
             }
             isDrawing.value = false;
             if (shouldNotifyDrawingActive) {
@@ -226,12 +262,13 @@ function DrawingCanvasComponent({
     }, [canvasWidth]);
 
     const handleClear = useCallback(() => {
-        hasUserDrawnRef.current = true;
         setStrokes([]);
+        serializedStrokesRef.current = [];
+        emitStrokesChange([]);
         resetLiveStroke(); // now safe — clears live for next draw
         setDrawingActive(false);
         onClear?.();
-    }, [onClear, resetLiveStroke, setDrawingActive]);
+    }, [emitStrokesChange, onClear, resetLiveStroke, setDrawingActive]);
 
     useEffect(() => {
         return () => {
@@ -253,7 +290,7 @@ function DrawingCanvasComponent({
         const previousInitialCount = previousInitialCountRef.current;
         if (previousInitialCount > 0 && currentInitialCount === 0 && strokes.length > 0) {
             setStrokes([]);
-            hasUserDrawnRef.current = false;
+            serializedStrokesRef.current = [];
             resetLiveStroke();
         }
         previousInitialCountRef.current = currentInitialCount;
@@ -261,11 +298,11 @@ function DrawingCanvasComponent({
 
     useEffect(() => {
         initialLoadDoneRef.current = false;
-        hasUserDrawnRef.current = false;
         clearLiveAfterCommitRef.current = false;
         strokeIdRef.current = 0;
         previousInitialCountRef.current = 0;
         previousScaleRef.current = 1;
+        serializedStrokesRef.current = [];
         setStrokes([]);
         resetLiveStroke();
         setDrawingActive(false);
@@ -278,6 +315,7 @@ function DrawingCanvasComponent({
         if (initialLoadDoneRef.current) return;
 
         const loaded: RenderStroke[] = [];
+        const loadedSerialized: StrokeData[] = [];
 
         for (const stroke of initialDrawings) {
             const svg = typeof stroke === 'string' ? stroke : stroke.svg;
@@ -303,14 +341,20 @@ function DrawingCanvasComponent({
                     width: logicalWidth * displayScale,
                     blendMode,
                 });
+                loadedSerialized.push({
+                    svg,
+                    color,
+                    width: logicalWidth,
+                    blendMode,
+                });
             } catch (error) {
                 if (__DEV__) console.warn('Failed to parse SVG path:', svg, error);
             }
         }
 
         initialLoadDoneRef.current = true;
-        hasUserDrawnRef.current = false;
         previousScaleRef.current = displayScale;
+        serializedStrokesRef.current = loadedSerialized;
         setStrokes(loaded);
     }, [initialDrawings, canvasWidth, displayScale]);
 
@@ -330,29 +374,6 @@ function DrawingCanvasComponent({
             width: stroke.width * ratio,
         })));
     }, [displayScale]);
-
-    // Save logical strokes back (consider debouncing if needed)
-    useEffect(() => {
-        if (!hasUserDrawnRef.current || !onStrokesChangeRef.current || displayScale <= 0) return;
-
-        const inverse = 1 / displayScale;
-        const data: StrokeData[] = strokes.map((stroke) => {
-            const logicalPath = inverse === 1
-                ? stroke.path
-                : scaledPathCopy(stroke.path, inverse);
-            const svg = logicalPath.toSVGString();
-            if (!svg) return null;
-
-            return {
-                svg,
-                color: stroke.color,
-                width: stroke.width * inverse,
-                blendMode: stroke.blendMode,
-            } as StrokeData;
-        }).filter(Boolean) as StrokeData[];
-
-        onStrokesChangeRef.current(data);
-    }, [strokes, displayScale]);
 
     const renderCanvas = useCallback(() => (
         <GestureDetector gesture={drawingGesture}>

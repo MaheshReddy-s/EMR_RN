@@ -3,8 +3,12 @@
  * Used by visit details modal and consultation pre-filling logic.
  */
 
-import type { ConsultationState, StrokeData, TabType } from '@/entities/consultation/types';
-import { SECTION_KEYS } from '@/hooks/useConsultation';
+import {
+    CONSULTATION_SECTION_KEYS,
+    type ConsultationState,
+    type StrokeData,
+    type TabType,
+} from '@/entities/consultation/types';
 
 export interface ConsultationDetailRow {
     text: string;
@@ -32,7 +36,7 @@ export function mapToConsultationState(payload: Record<string, unknown>): Partia
 
     sections.forEach((section) => {
         // Only map sections that exist in ConsultationState
-        if (SECTION_KEYS.includes(section.key as TabType)) {
+        if (CONSULTATION_SECTION_KEYS.includes(section.key as TabType)) {
             state[section.key] = section.rows.map((row) => ({
                 id: row.id || Date.now().toString() + Math.random(),
                 name: row.name || row.text,

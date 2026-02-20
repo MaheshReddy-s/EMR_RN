@@ -1,12 +1,10 @@
 import { useEffect } from 'react';
 import { Alert, AppState } from 'react-native';
+import {
+    CONSULTATION_SECTION_KEYS,
+    type ConsultationState,
+} from '@/entities/consultation/types';
 import { DraftService } from '@/services/draft-service';
-import type { ConsultationState, TabType } from '@/hooks/useConsultation';
-
-const SECTION_KEYS: TabType[] = [
-    'complaints', 'diagnosis', 'examination', 'investigation',
-    'procedure', 'prescriptions', 'instruction', 'notes',
-];
 
 interface UseConsultationDraftParams {
     patientId?: string;
@@ -61,7 +59,7 @@ export function useConsultationDraft({
 
         const saveDraftNow = () => {
             const sections: any = {};
-            for (const key of SECTION_KEYS) {
+            for (const key of CONSULTATION_SECTION_KEYS) {
                 const items = consultation[key];
                 if (items && (items as any[]).length > 0) {
                     sections[key] = items;

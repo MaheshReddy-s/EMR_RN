@@ -63,6 +63,14 @@ function getPrescriptionCacheKey(clinicId: string, doctorId: string): string {
     return `prescription:${clinicId}:${doctorId}`;
 }
 
+function invalidatePrescriptionCache(clinicId: string, doctorId: string): void {
+    prescriptionVersion++;
+    const key = getPrescriptionCacheKey(clinicId, doctorId);
+    suggestionCache.delete(key);
+    suggestionTimestamps.delete(key);
+    inFlightSuggestionRequests.delete(key);
+}
+
 export const ConsultationRepository = {
     /**
      * Submit a consultation record.
@@ -187,7 +195,6 @@ export const ConsultationRepository = {
         })();
 
         inFlightSuggestionRequests.set(key, request);
-        inFlightSuggestionRequests.set(key, request);
         return request;
     },
 
@@ -196,14 +203,9 @@ export const ConsultationRepository = {
      */
     async createPrescription(payload: Record<string, any>): Promise<any[]> {
         assertTenantContext('createPrescription');
-        const { doctorId } = requireTenantContext();
+        const { clinicId, doctorId } = requireTenantContext();
         await ConsultationService.createPrescription(doctorId, payload);
-        ConsultationRepository.invalidate('prescriptions' as any); // Or generic invalidate
-        // 'prescriptions' isn't a strict ConsultationSection, so let's use the generic invalidation 
-        // that handles prescriptionKey.
-        // Actually, invalidate() with no args clears everything including prescriptions.
-        ConsultationRepository.invalidate();
-        // Or we could be more specific if we added a specific invalidatePrescriptions
+        invalidatePrescriptionCache(clinicId, doctorId);
         return ConsultationRepository.getPrescriptions();
     },
 
@@ -221,9 +223,9 @@ export const ConsultationRepository = {
      */
     async updatePrescription(prescriptionId: string, payload: Record<string, any>): Promise<any[]> {
         assertTenantContext('updatePrescription');
-        const { doctorId } = requireTenantContext();
+        const { clinicId, doctorId } = requireTenantContext();
         await ConsultationService.updatePrescription(doctorId, prescriptionId, payload);
-        ConsultationRepository.invalidate();
+        invalidatePrescriptionCache(clinicId, doctorId);
         return ConsultationRepository.getPrescriptions();
     },
 
@@ -232,9 +234,9 @@ export const ConsultationRepository = {
      */
     async deletePrescription(prescriptionId: string, variantId?: string): Promise<boolean> {
         assertTenantContext('deletePrescription');
-        const { doctorId } = requireTenantContext();
+        const { clinicId, doctorId } = requireTenantContext();
         const result = await ConsultationService.deletePrescription(doctorId, prescriptionId, variantId);
-        ConsultationRepository.invalidate();
+        invalidatePrescriptionCache(clinicId, doctorId);
         return result;
     },
 

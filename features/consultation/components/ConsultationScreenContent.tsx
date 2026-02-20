@@ -43,7 +43,22 @@ const TABS: { id: TabType; label: string }[] = [
     { id: 'diagnosis', label: 'Diagnosis' },
 ];
 
-interface ConsultationScreenContentProps {
+const SECTION_BLOCKS: Array<{
+    key: TabType;
+    title: string;
+    selectItems: (props: ConsultationScreenContentProps) => ConsultationItem[];
+}> = [
+    { key: 'complaints', title: 'Complaints', selectItems: (props) => props.complaints },
+    { key: 'diagnosis', title: 'Diagnosis', selectItems: (props) => props.diagnoses },
+    { key: 'examination', title: 'Examination', selectItems: (props) => props.examinations },
+    { key: 'investigation', title: 'Investigation', selectItems: (props) => props.investigations },
+    { key: 'procedure', title: 'Procedure', selectItems: (props) => props.procedures },
+    { key: 'prescriptions', title: 'Prescriptions', selectItems: (props) => props.prescriptions },
+    { key: 'instruction', title: 'Instruction', selectItems: (props) => props.instructions },
+    { key: 'notes', title: 'Notes', selectItems: (props) => props.notes },
+];
+
+export interface ConsultationScreenContentProps {
     isWeb: boolean;
     patientId: string;
     patient: Patient | null;
@@ -262,6 +277,7 @@ export function ConsultationScreenContent(props: ConsultationScreenContentProps)
         MIN_CONSULTATION_PEN_THICKNESS,
         props.penThickness * CONSULTATION_PEN_THICKNESS_FACTOR
     );
+    const activeTabLabel = TABS.find((tab) => tab.id === props.activeTab)?.label || props.activeTab;
 
     const renderSuggestionChip = (suggestion: ConsultationSuggestion) => (
         <TouchableOpacity
@@ -338,7 +354,7 @@ export function ConsultationScreenContent(props: ConsultationScreenContentProps)
                 <View className="px-4 py-3 bg-white">
                     <View className="flex-row items-center mb-3">
                         <Text className="text-gray-400 text-[13.5px] font-medium mr-1">
-                            Add or Search {TABS.find((t) => t.id === props.activeTab)?.label}:
+                            Add or Search {activeTabLabel}:
                         </Text>
                         <Text className="text-black text-[14px] font-bold mr-3" numberOfLines={1}>
                             {props.writingText || '...'}
@@ -420,126 +436,29 @@ export function ConsultationScreenContent(props: ConsultationScreenContentProps)
                     contentContainerStyle={{ paddingBottom: 100 }}
                 >
                     <View className="mt-2">
-                        {(props.activeTab === 'complaints' || props.complaints.length > 0) && (
-                            <ConsultationSectionBlock
-                                title="Complaints"
-                                sectionKey="complaints"
-                                items={props.complaints}
-                                penThickness={effectivePenThickness}
-                                onDrawingActive={props.onDrawingActive}
-                                clearSection={props.clearSection}
-                                onExpandRow={props.onExpandRow}
-                                onRemoveItem={props.removeItem}
-                                onStrokesChange={props.onStrokesChange}
-                                onEditRow={props.onEditRow}
-                                onClearRow={props.onClearRow}
-                            />
-                        )}
-                        {(props.activeTab === 'diagnosis' || props.diagnoses.length > 0) && (
-                            <ConsultationSectionBlock
-                                title="Diagnosis"
-                                sectionKey="diagnosis"
-                                items={props.diagnoses}
-                                penThickness={effectivePenThickness}
-                                onDrawingActive={props.onDrawingActive}
-                                clearSection={props.clearSection}
-                                onExpandRow={props.onExpandRow}
-                                onRemoveItem={props.removeItem}
-                                onStrokesChange={props.onStrokesChange}
-                                onEditRow={props.onEditRow}
-                                onClearRow={props.onClearRow}
-                            />
-                        )}
-                        {(props.activeTab === 'examination' || props.examinations.length > 0) && (
-                            <ConsultationSectionBlock
-                                title="Examination"
-                                sectionKey="examination"
-                                items={props.examinations}
-                                penThickness={effectivePenThickness}
-                                onDrawingActive={props.onDrawingActive}
-                                clearSection={props.clearSection}
-                                onExpandRow={props.onExpandRow}
-                                onRemoveItem={props.removeItem}
-                                onStrokesChange={props.onStrokesChange}
-                                onEditRow={props.onEditRow}
-                                onClearRow={props.onClearRow}
-                            />
-                        )}
-                        {(props.activeTab === 'investigation' || props.investigations.length > 0) && (
-                            <ConsultationSectionBlock
-                                title="Investigation"
-                                sectionKey="investigation"
-                                items={props.investigations}
-                                penThickness={effectivePenThickness}
-                                onDrawingActive={props.onDrawingActive}
-                                clearSection={props.clearSection}
-                                onExpandRow={props.onExpandRow}
-                                onRemoveItem={props.removeItem}
-                                onStrokesChange={props.onStrokesChange}
-                                onEditRow={props.onEditRow}
-                                onClearRow={props.onClearRow}
-                            />
-                        )}
-                        {(props.activeTab === 'procedure' || props.procedures.length > 0) && (
-                            <ConsultationSectionBlock
-                                title="Procedure"
-                                sectionKey="procedure"
-                                items={props.procedures}
-                                penThickness={effectivePenThickness}
-                                onDrawingActive={props.onDrawingActive}
-                                clearSection={props.clearSection}
-                                onExpandRow={props.onExpandRow}
-                                onRemoveItem={props.removeItem}
-                                onStrokesChange={props.onStrokesChange}
-                                onEditRow={props.onEditRow}
-                                onClearRow={props.onClearRow}
-                            />
-                        )}
-                        {(props.activeTab === 'prescriptions' || props.prescriptions.length > 0) && (
-                            <ConsultationSectionBlock
-                                title="Prescriptions"
-                                sectionKey="prescriptions"
-                                items={props.prescriptions}
-                                penThickness={effectivePenThickness}
-                                onDrawingActive={props.onDrawingActive}
-                                clearSection={props.clearSection}
-                                onExpandRow={props.onExpandRow}
-                                onRemoveItem={props.removeItem}
-                                onStrokesChange={props.onStrokesChange}
-                                onEditRow={props.onEditRow}
-                                onClearRow={props.onClearRow}
-                            />
-                        )}
-                        {(props.activeTab === 'instruction' || props.instructions.length > 0) && (
-                            <ConsultationSectionBlock
-                                title="Instruction"
-                                sectionKey="instruction"
-                                items={props.instructions}
-                                penThickness={effectivePenThickness}
-                                onDrawingActive={props.onDrawingActive}
-                                clearSection={props.clearSection}
-                                onExpandRow={props.onExpandRow}
-                                onRemoveItem={props.removeItem}
-                                onStrokesChange={props.onStrokesChange}
-                                onEditRow={props.onEditRow}
-                                onClearRow={props.onClearRow}
-                            />
-                        )}
-                        {(props.activeTab === 'notes' || props.notes.length > 0) && (
-                            <ConsultationSectionBlock
-                                title="Notes"
-                                sectionKey="notes"
-                                items={props.notes}
-                                penThickness={effectivePenThickness}
-                                onDrawingActive={props.onDrawingActive}
-                                clearSection={props.clearSection}
-                                onExpandRow={props.onExpandRow}
-                                onRemoveItem={props.removeItem}
-                                onStrokesChange={props.onStrokesChange}
-                                onEditRow={props.onEditRow}
-                                onClearRow={props.onClearRow}
-                            />
-                        )}
+                        {SECTION_BLOCKS.map((section) => {
+                            const items = section.selectItems(props);
+                            if (props.activeTab !== section.key && items.length === 0) {
+                                return null;
+                            }
+
+                            return (
+                                <ConsultationSectionBlock
+                                    key={section.key}
+                                    title={section.title}
+                                    sectionKey={section.key}
+                                    items={items}
+                                    penThickness={effectivePenThickness}
+                                    onDrawingActive={props.onDrawingActive}
+                                    clearSection={props.clearSection}
+                                    onExpandRow={props.onExpandRow}
+                                    onRemoveItem={props.removeItem}
+                                    onStrokesChange={props.onStrokesChange}
+                                    onEditRow={props.onEditRow}
+                                    onClearRow={props.onClearRow}
+                                />
+                            );
+                        })}
                     </View>
                 </ScrollView>
 

@@ -1,7 +1,7 @@
 import { Platform } from 'react-native';
 import { File as FSFile, Paths } from 'expo-file-system';
 import { ConsultationItem } from '@/types/consultation';
-import { SECTION_KEYS, TabType } from '@/hooks/useConsultation';
+import { CONSULTATION_SECTION_KEYS, type TabType } from '@/entities/consultation/types';
 
 /**
  * DraftService
@@ -39,7 +39,7 @@ function getDraftFile(): FSFile {
  */
 function sanitizeForStorage(sections: Partial<Record<TabType, ConsultationItem[]>>): Partial<Record<TabType, ConsultationItem[]>> {
     const clean: Partial<Record<TabType, ConsultationItem[]>> = {};
-    for (const key of SECTION_KEYS) {
+    for (const key of CONSULTATION_SECTION_KEYS) {
         const items = sections[key];
         if (items && items.length > 0) {
             clean[key] = items.map(item => ({
