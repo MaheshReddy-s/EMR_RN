@@ -290,7 +290,8 @@ export function useConsultationSubmit({
                 });
             }
 
-            const pdfUri = await PdfService.createEncryptedPdf(previewData as any);
+            const renderOptions = (previewData as any)?.__renderOptions;
+            const pdfUri = await PdfService.createEncryptedPdf(previewData as any, renderOptions);
             if (!pdfUri) {
                 throw new AppError({
                     code: APP_ERROR_CODES.UNKNOWN,

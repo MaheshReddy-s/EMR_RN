@@ -2,6 +2,7 @@ import React, { useCallback, useRef, useState } from 'react';
 import { Alert, Platform, ScrollView, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { EditProfileModal } from '@/components/patient/EditProfileModal';
+import type { PdfFilterRenderOptions } from '@/components/consultation/pdf-filter-modal';
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
 import { ConsultationScreenContent } from '@/features/consultation/components/ConsultationScreenContent';
 import { useConsultationDraft } from '@/features/consultation/hooks/useConsultationDraft';
@@ -10,13 +11,22 @@ import { ConsultationSuggestion, useConsultationSuggestions } from '@/features/c
 import { useConsultationSubmit } from '@/features/consultation/hooks/useConsultationSubmit';
 import { ConsultationItem, StrokeData } from '@/entities';
 import { useConsultation, TabType, SECTION_KEYS } from '@/hooks/useConsultation';
+import { useTenant } from '@/hooks/useTenant';
+import { API_ENDPOINTS } from '@/constants/endpoints';
 import { ConsultationRepository, MasterDataRepository } from '@/repositories';
 import { DraftService } from '@/services/draft-service';
 import { PdfService, PdfSection } from '@/services/pdf-service';
 import { mapToConsultationState } from '@/shared/lib/consultation-mapper';
 import type { PrescriptionData } from '@/entities/consultation/types';
+import { api } from '@/lib/api-client';
 
 const DEFAULT_PDF_SECTION_IDS = ['complaints', 'diagnosis', 'examination', 'investigation', 'procedure', 'prescriptions', 'instruction', 'notes'];
+const DEFAULT_PDF_RENDER_OPTIONS: PdfFilterRenderOptions = {
+    includePatientDetails: true,
+    includeDoctorDetails: true,
+    includeHeaderSection: true,
+    includeFooterSection: true,
+};
 const SECTION_LABELS: Record<TabType, string> = {
     complaints: 'Complaints',
     diagnosis: 'Diagnosis',
@@ -27,6 +37,17 @@ const SECTION_LABELS: Record<TabType, string> = {
     instruction: 'Instruction',
     notes: 'Notes',
 };
+
+const SECTION_SETTINGS_KEYS: Array<{ id: string; key: string }> = [
+    { id: 'complaints', key: 'complaints' },
+    { id: 'diagnosis', key: 'diagnosis' },
+    { id: 'examination', key: 'examination' },
+    { id: 'investigation', key: 'investigation' },
+    { id: 'procedure', key: 'procedure' },
+    { id: 'prescriptions', key: 'prescriptions' },
+    { id: 'instruction', key: 'instruction' },
+    { id: 'notes', key: 'notes' },
+];
 
 function firstParam(value: string | string[] | undefined): string | undefined {
     if (Array.isArray(value)) return value[0];
@@ -44,12 +65,14 @@ export default function ConsultationScreen() {
     const aptTimestampRaw = firstParam(params.aptTimestamp);
     const appointmentTimestamp = aptTimestampRaw ? Number(aptTimestampRaw) : null;
     const router = useRouter();
+    const { clinicId, doctorId } = useTenant();
     const isWeb = Platform.OS === 'web';
-    const [isDrawingActive, setIsDrawingActive] = useState(false);
+    const [penThickness, setPenThickness] = useState(1.5);
     const scrollViewRef = useRef<ScrollView>(null);
     const {
         state: consultation, addItem, removeItem, updateItem,
-        setStrokes, clearSection, clearItemDrawings, restoreDraft
+        setStrokes, clearSection, clearItemDrawings, restoreDraft,
+        startTimer, stopTimer, resetSession,
     } = useConsultation();
     const { complaints, diagnosis: diagnoses, examination: examinations, investigation: investigations, procedure: procedures, prescriptions, instruction: instructions, notes, elapsedTime } = consultation;
     const [currentInputStrokes, setCurrentInputStrokes] = useState<StrokeData[]>([]);
@@ -70,6 +93,10 @@ export default function ConsultationScreen() {
     const [isPrintPreviewVisible, setIsPrintPreviewVisible] = useState(false);
     const [previewHtml, setPreviewHtml] = useState('');
     const [previewData, setPreviewData] = useState<any>(null);
+    const [pdfSectionVisibility, setPdfSectionVisibility] = useState<Record<string, boolean>>(
+        () => DEFAULT_PDF_SECTION_IDS.reduce((acc, id) => ({ ...acc, [id]: true }), {})
+    );
+    const [pdfRenderOptions, setPdfRenderOptions] = useState<PdfFilterRenderOptions>(DEFAULT_PDF_RENDER_OPTIONS);
     const [followUpDate, setFollowUpDate] = useState<Date | null>(null);
     const [editingPropertySuggestion, setEditingPropertySuggestion] = useState<ConsultationSuggestion | null>(null);
 
@@ -86,6 +113,61 @@ export default function ConsultationScreen() {
     useConsultationDraft({ patientId, consultation, restoreDraft });
 
     const hasInitializedRef = useRef(false);
+    const consultationSessionKey = `${patientId}:${appointmentId || 'walkin'}`;
+
+    React.useEffect(() => {
+        resetSession();
+        startTimer();
+
+        return () => {
+            stopTimer();
+        };
+    }, [consultationSessionKey, resetSession, startTimer, stopTimer]);
+
+    React.useEffect(() => {
+        let isCancelled = false;
+
+        const loadConsultationSettings = async () => {
+            if (!clinicId || !doctorId) return;
+
+            try {
+                const settings: any = await api.get(API_ENDPOINTS.SETTINGS.GET(clinicId, doctorId));
+                const value = Number(settings?.pencil_thickness);
+                const normalized = Number.isFinite(value)
+                    ? Math.max(1, Math.min(50, value))
+                    : 1.5;
+
+                if (!isCancelled) {
+                    setPenThickness(normalized);
+
+                    const nextVisibility: Record<string, boolean> = DEFAULT_PDF_SECTION_IDS
+                        .reduce((acc, id) => ({ ...acc, [id]: true }), {} as Record<string, boolean>);
+                    for (const section of SECTION_SETTINGS_KEYS) {
+                        nextVisibility[section.id] = settings?.[section.key] !== false;
+                    }
+                    setPdfSectionVisibility(nextVisibility);
+
+                    const nextRenderOptions: PdfFilterRenderOptions = {
+                        includeDoctorDetails: settings?.doctor_details_in_consultation ?? true,
+                        includePatientDetails: settings?.patient_details_in_consultation ?? true,
+                        includeHeaderSection: settings?.letterpad_header ?? true,
+                        includeFooterSection: settings?.letterpad_footer ?? false,
+                    };
+                    setPdfRenderOptions(nextRenderOptions);
+                }
+            } catch (error) {
+                if (__DEV__) {
+                    console.warn('[Consultation] Failed to load consultation settings:', error);
+                }
+            }
+        };
+
+        void loadConsultationSettings();
+
+        return () => {
+            isCancelled = true;
+        };
+    }, [clinicId, doctorId]);
 
     // Pre-fill from latest history if no draft was restored and state is empty
     React.useEffect(() => {
@@ -136,23 +218,31 @@ export default function ConsultationScreen() {
         },
     });
 
-    const preparePrintPreview = (enabledSectionIds?: string[], overrideFollowUpDate?: Date | null) => {
+    const preparePrintPreview = (
+        enabledSectionIds?: string[],
+        overrideFollowUpDate?: Date | null,
+        overrideRenderOptions?: PdfFilterRenderOptions
+    ) => {
         if (!patient || !user) {
             Alert.alert('Error', 'Patient or User data missing');
             return;
         }
         const resolvedFollowUpDate = overrideFollowUpDate !== undefined ? overrideFollowUpDate : followUpDate;
-        const ids = enabledSectionIds || DEFAULT_PDF_SECTION_IDS;
-        const sections: PdfSection[] = [
-            { id: 'complaints', title: 'Chief Complaints', items: complaints },
+        const ids = enabledSectionIds && enabledSectionIds.length > 0
+            ? enabledSectionIds
+            : DEFAULT_PDF_SECTION_IDS.filter((id) => pdfSectionVisibility[id] !== false);
+        const renderOptions = overrideRenderOptions || pdfRenderOptions;
+        const allSections: PdfSection[] = [
+            { id: 'complaints', title: 'Complaints', items: complaints },
             { id: 'diagnosis', title: 'Diagnosis', items: diagnoses },
             { id: 'examination', title: 'Examination', items: examinations },
             { id: 'investigation', title: 'Investigation', items: investigations },
             { id: 'procedure', title: 'Procedures', items: procedures },
             { id: 'prescriptions', title: 'Prescriptions', items: prescriptions.map((p) => ({ ...p, isPrescription: true })) },
             { id: 'instruction', title: 'Instructions', items: instructions },
-            { id: 'notes', title: 'Clinical Notes', items: notes },
-        ].filter((section) => ids.includes(section.id) && section.items.length > 0) as PdfSection[];
+            { id: 'notes', title: 'Notes', items: notes },
+        ].filter((section) => section.items.length > 0) as PdfSection[];
+        const sections = allSections.filter((section) => ids.includes(section.id));
         const data = {
             patient,
             doctor: user,
@@ -160,8 +250,13 @@ export default function ConsultationScreen() {
             sections,
             followUpDate: resolvedFollowUpDate ? resolvedFollowUpDate.toLocaleDateString('en-GB') : undefined,
         };
-        setPreviewHtml(PdfService.generateHtml(data));
-        setPreviewData(data);
+        setPreviewHtml(PdfService.generateHtml(data, renderOptions));
+        setPreviewData({
+            ...data,
+            __renderOptions: renderOptions,
+            __availableSections: allSections,
+            __selectedSectionIds: ids,
+        });
         setIsPrintPreviewVisible(true);
     };
 
@@ -195,11 +290,59 @@ export default function ConsultationScreen() {
     };
 
     const handleStrokesChange = useCallback((section: TabType, id: string, strokes: StrokeData[]) => setStrokes(section, id, strokes), [setStrokes]);
-    const handleBack = () => router.back();
-    const handleNext = () => setIsFollowUpModalVisible(true);
-    const handleFollowUpContinue = (date: Date) => { setFollowUpDate(date); setIsFollowUpModalVisible(false); preparePrintPreview(undefined, date); };
-    const handleFollowUpSkip = () => { setFollowUpDate(null); setIsFollowUpModalVisible(false); preparePrintPreview(undefined, null); };
-    const generatePdfReport = async (enabledSectionIds: string[]) => preparePrintPreview(enabledSectionIds);
+
+    const isConsultationInProgress = useCallback(() => {
+        const hasSectionItems = SECTION_KEYS.some((key) => {
+            const items = consultation[key] as ConsultationItem[];
+            return Array.isArray(items) && items.length > 0;
+        });
+
+        return hasSectionItems || writingText.trim().length > 0 || currentInputStrokes.length > 0;
+    }, [consultation, writingText, currentInputStrokes]);
+
+    const handleBack = useCallback(() => {
+        if (!isConsultationInProgress()) {
+            stopTimer();
+            router.back();
+            return;
+        }
+
+        Alert.alert(
+            'Leave Consultation?',
+            'Consultation is in progress. If you go back now, unsaved changes may be lost.',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Leave',
+                    style: 'destructive',
+                    onPress: () => {
+                        stopTimer();
+                        router.back();
+                    }
+                },
+            ]
+        );
+    }, [isConsultationInProgress, router, stopTimer]);
+    const handleNext = () => {
+        stopTimer();
+        setIsFollowUpModalVisible(true);
+    };
+    const handleFollowUpContinue = (date: Date) => {
+        stopTimer();
+        setFollowUpDate(date);
+        setIsFollowUpModalVisible(false);
+        preparePrintPreview(undefined, date);
+    };
+    const handleFollowUpSkip = () => {
+        stopTimer();
+        setFollowUpDate(null);
+        setIsFollowUpModalVisible(false);
+        preparePrintPreview(undefined, null);
+    };
+    const generatePdfReport = async (enabledSectionIds: string[], renderOptions: PdfFilterRenderOptions) => {
+        setPdfRenderOptions(renderOptions);
+        preparePrintPreview(enabledSectionIds, undefined, renderOptions);
+    };
 
     const handleExpandRow = (section: TabType, id: string) => {
         const item = (consultation[section] as ConsultationItem[]).find((entry) => entry.id === id);
@@ -363,7 +506,10 @@ export default function ConsultationScreen() {
                 user={user}
                 isLoadingPatient={isLoadingPatient}
                 patientError={patientError}
-                onErrorBack={() => router.replace('/(app)/dashboard')}
+                onErrorBack={() => {
+                    stopTimer();
+                    router.replace('/(app)/dashboard');
+                }}
                 onBack={handleBack}
                 onNext={handleNext}
                 activeTab={activeTab}
@@ -380,9 +526,8 @@ export default function ConsultationScreen() {
                 onClearInput={() => { setWritingText(''); setCurrentInputStrokes([]); }}
                 onClearAll={handleClearAll}
                 elapsedTime={elapsedTime}
-                isDrawingActive={isDrawingActive}
-                onDrawingActive={setIsDrawingActive}
                 scrollViewRef={scrollViewRef}
+                penThickness={penThickness}
                 complaints={complaints}
                 diagnoses={diagnoses}
                 examinations={examinations}

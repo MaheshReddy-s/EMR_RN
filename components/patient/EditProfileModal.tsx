@@ -166,6 +166,14 @@ export function EditProfileModal({ visible, onClose, patient, onSave }: EditProf
         );
     };
 
+    const handleBackdropPress = () => {
+        if (activeDropdown) {
+            setActiveDropdown(null);
+            return;
+        }
+        onClose();
+    };
+
     return (
         <Modal
             animationType="fade"
@@ -179,50 +187,56 @@ export function EditProfileModal({ visible, onClose, patient, onSave }: EditProf
                 onClose();
             }}
         >
-            <View className="flex-1 justify-center items-center bg-black/40 px-4">
-                <KeyboardAvoidingView
-                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                    className={`w-full ${isWeb ? 'max-w-4xl' : 'max-w-[500px]'} bg-white rounded-3xl shadow-xl overflow-hidden`}
-                >
-                    {/* Header */}
-                    <View className="flex-row items-center justify-between px-6 py-4 border-b border-gray-100">
-                        <TouchableOpacity onPress={onClose} className="p-2">
-                            <Icon icon={EDIT_PROFILE_ICONS.close} size={28} color="#007AFF" />
-                        </TouchableOpacity>
-                        <Text className="text-gray-900 text-[18px] font-bold">Edit Profile</Text>
-                        <TouchableOpacity onPress={handleSave} disabled={isSaving}>
-                            {isSaving ? (
-                                <ActivityIndicator size="small" color="#007AFF" />
-                            ) : (
-                                <Icon icon={EDIT_PROFILE_ICONS.check} size={28} color="#22c55e" />
-                            )}
-                        </TouchableOpacity>
-                    </View>
-
-                    <ScrollView
-                        showsVerticalScrollIndicator={false}
-                        className="py-6 max-h-[80vh]"
-                        keyboardShouldPersistTaps="handled"
+            <KeyboardAvoidingView
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                className="flex-1"
+            >
+                <Pressable className="flex-1 justify-center items-center bg-black/40 px-4 py-8" onPress={handleBackdropPress}>
+                    <Pressable
+                        onPress={(event) => event.stopPropagation()}
+                        className={`w-full ${isWeb ? 'max-w-4xl' : 'max-w-[500px]'} bg-white rounded-3xl shadow-xl overflow-hidden`}
+                        style={{ maxHeight: '100%' }}
                     >
-                        <View className={isWeb ? "flex-row flex-wrap px-4" : ""}>
-                            {renderField('Prefix', formData.prefix || 'Mr.', 'prefix', 'Prefix', 'default', true, ['Mr.', 'Mrs.', 'Ms.', 'Dr.'], 'w-1/6')}
-                            {renderField('Name', formData.patient_name || '', 'patient_name', 'Full Name', 'default', false, [], 'w-5/12')}
-                            {renderField('Mobile', formData.patient_mobile || '', 'patient_mobile', 'Mobile number', 'phone-pad', false, [], 'w-5/12')}
-
-                            {renderField('Gender', formData.gender || 'Male', 'gender', 'Gender', 'default', true, ['Male', 'Female', 'Other'], 'w-1/3')}
-                            {renderField('Age', formData.age?.toString() || '', 'age' as any, 'Age', 'numeric', false, [], 'w-1/3')}
-                            {renderField('Blood Group', formData.blood_group || '', 'blood_group', 'Blood Group', 'default', false, [], 'w-1/3')}
-
-                            {renderField('Height', formData.height || '', 'height', 'Height in feet', 'default', false, [], 'w-1/2')}
-                            {renderField('Weight', formData.weight || '', 'weight', 'Weight in Kgs', 'numeric', false, [], 'w-1/2')}
-
-                            {renderField('Locality', formData.locality || '', 'locality', 'Locality', 'default', false, [], 'w-2/3')}
-                            {renderField('Pin Code', formData.pincode || '', 'pincode', 'Pincode', 'numeric', false, [], 'w-1/3')}
+                        {/* Header */}
+                        <View className="flex-row items-center justify-between px-6 py-4 border-b border-gray-100">
+                            <TouchableOpacity onPress={onClose} className="p-2">
+                                <Icon icon={EDIT_PROFILE_ICONS.close} size={28} color="#007AFF" />
+                            </TouchableOpacity>
+                            <Text className="text-gray-900 text-[18px] font-bold">Edit Profile</Text>
+                            <TouchableOpacity onPress={handleSave} disabled={isSaving}>
+                                {isSaving ? (
+                                    <ActivityIndicator size="small" color="#007AFF" />
+                                ) : (
+                                    <Icon icon={EDIT_PROFILE_ICONS.check} size={28} color="#22c55e" />
+                                )}
+                            </TouchableOpacity>
                         </View>
 
-                        <View className="h-10" />
-                    </ScrollView>
-                </KeyboardAvoidingView>
+                        <ScrollView
+                            showsVerticalScrollIndicator={false}
+                            className="py-6"
+                            keyboardShouldPersistTaps="handled"
+                        >
+                            <View className={isWeb ? "flex-row flex-wrap px-4" : ""}>
+                                {renderField('Prefix', formData.prefix || 'Mr.', 'prefix', 'Prefix', 'default', true, ['Mr.', 'Mrs.', 'Ms.', 'Dr.'], 'w-1/6')}
+                                {renderField('Name', formData.patient_name || '', 'patient_name', 'Full Name', 'default', false, [], 'w-5/12')}
+                                {renderField('Mobile', formData.patient_mobile || '', 'patient_mobile', 'Mobile number', 'phone-pad', false, [], 'w-5/12')}
+
+                                {renderField('Gender', formData.gender || 'Male', 'gender', 'Gender', 'default', true, ['Male', 'Female', 'Other'], 'w-1/3')}
+                                {renderField('Age', formData.age?.toString() || '', 'age' as any, 'Age', 'numeric', false, [], 'w-1/3')}
+                                {renderField('Blood Group', formData.blood_group || '', 'blood_group', 'Blood Group', 'default', false, [], 'w-1/3')}
+
+                                {renderField('Height', formData.height || '', 'height', 'Height in feet', 'default', false, [], 'w-1/2')}
+                                {renderField('Weight', formData.weight || '', 'weight', 'Weight in Kgs', 'numeric', false, [], 'w-1/2')}
+
+                                {renderField('Locality', formData.locality || '', 'locality', 'Locality', 'default', false, [], 'w-2/3')}
+                                {renderField('Pin Code', formData.pincode || '', 'pincode', 'Pincode', 'numeric', false, [], 'w-1/3')}
+                            </View>
+
+                            <View className="h-10" />
+                        </ScrollView>
+                    </Pressable>
+                </Pressable>
 
                 {activeDropdown ? (
                     <View className="absolute inset-0 justify-center items-center px-6" style={{ zIndex: 20 }}>
@@ -251,7 +265,7 @@ export function EditProfileModal({ visible, onClose, patient, onSave }: EditProf
                         </View>
                     </View>
                 ) : null}
-            </View>
+            </KeyboardAvoidingView>
         </Modal>
     );
 }

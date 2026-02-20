@@ -3,6 +3,7 @@ import { EDIT_PROFILE_ICONS } from '@/constants/icons';
 import React, { useEffect, useState } from 'react';
 import {
     Modal,
+    Pressable,
     Text,
     TextInput,
     TouchableOpacity,
@@ -49,6 +50,14 @@ export default function FollowupInfoModal({
         });
     };
 
+    const handleBackdropPress = () => {
+        if (isDropdownOpen) {
+            setIsDropdownOpen(false);
+            return;
+        }
+        onClose();
+    };
+
     return (
         <Modal
             visible={visible}
@@ -56,8 +65,11 @@ export default function FollowupInfoModal({
             animationType="fade"
             onRequestClose={onClose}
         >
-            <View className="flex-1 bg-black/30 justify-center items-center px-4">
-                <View className="w-full max-w-[560px] rounded-2xl overflow-hidden bg-white">
+            <Pressable className="flex-1 bg-black/30 justify-center items-center px-4" onPress={handleBackdropPress}>
+                <Pressable
+                    onPress={(event) => event.stopPropagation()}
+                    className="w-full max-w-[560px] rounded-2xl overflow-hidden bg-white"
+                >
                     <View className="bg-[#0A84FF] px-5 py-4 flex-row items-center justify-between">
                         <TouchableOpacity onPress={onClose} className="p-1">
                             <Icon icon={EDIT_PROFILE_ICONS.close} size={22} color="#FFFFFF" />
@@ -122,8 +134,8 @@ export default function FollowupInfoModal({
                             This note will be shown in the Reminder List for front office staff to follow up with the patient.
                         </Text>
                     </View>
-                </View>
-            </View>
+                </Pressable>
+            </Pressable>
         </Modal>
     );
 }

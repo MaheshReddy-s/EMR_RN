@@ -3,6 +3,7 @@ import { Icon } from '@/components/ui/Icon';
 import React, { useEffect, useState } from 'react';
 import {
     Modal,
+    Pressable,
     SafeAreaView,
     ScrollView,
     Text,
@@ -96,8 +97,11 @@ export default function PrescriptionModal({
             transparent={true}
             onRequestClose={onClose}
         >
-            <View className="flex-1 bg-black/40 justify-center items-center p-4">
-                <View className="w-full max-w-3xl h-[85%] bg-white rounded-xl shadow-2xl overflow-hidden">
+            <Pressable className="flex-1 bg-black/40 justify-center items-center p-4" onPress={onClose}>
+                <Pressable
+                    onPress={(event) => event.stopPropagation()}
+                    className="w-full max-w-3xl h-[85%] bg-white rounded-xl shadow-2xl overflow-hidden"
+                >
                     {/* Header Controls */}
                     <View className="flex-row justify-between items-center px-4 py-3 border-b border-gray-100">
                         <TouchableOpacity onPress={onClose} className="p-1">
@@ -178,8 +182,8 @@ export default function PrescriptionModal({
                             </ScrollView>
                         </View>
                     </View>
-                </View>
-            </View>
+                </Pressable>
+            </Pressable>
 
             <PrescriptionEditModal
                 visible={isEditModalVisible}

@@ -4,6 +4,7 @@ import ConsultationSettingsSection from '@/features/settings/components/Consulta
 import ComingSoonSection from '@/features/settings/components/ComingSoonSection';
 import MasterDataSection from '@/features/settings/components/MasterDataSection';
 import SectionsOrderSection from '@/features/settings/components/SectionsOrderSection';
+import type { PrescriptionData } from '@/entities/consultation/types';
 import type { AdvancedSettings, ListItem, SettingSection } from '@/features/settings/types';
 import type { MasterDataItem } from '@/repositories';
 
@@ -33,7 +34,7 @@ interface SettingsContentProps {
     onSearchQueryChange: (query: string) => void;
     advancedSettings: AdvancedSettingsComponentProps;
     isPrescriptionModalVisible: boolean;
-    currentPrescriptionData: any;
+    currentPrescriptionData: PrescriptionData | null;
 }
 
 const SettingsContent = ({

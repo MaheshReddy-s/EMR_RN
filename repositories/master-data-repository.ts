@@ -1,6 +1,7 @@
 import {
     MasterDataCategory,
     MasterDataItem,
+    MasterDataValue,
     MasterDataService,
 } from '@/services/master-data-service';
 import { APP_ERROR_CODES } from '@/shared/lib/app-error';
@@ -103,7 +104,7 @@ export const MasterDataRepository = {
         return request;
     },
 
-    async addItem(category: MasterDataCategory, value: string): Promise<boolean> {
+    async addItem(category: MasterDataCategory, value: MasterDataValue): Promise<boolean> {
         assertTenantContext('addItem');
         try {
             const { doctorId } = requireTenantContext();
@@ -122,7 +123,7 @@ export const MasterDataRepository = {
     async updateItem(
         category: MasterDataCategory,
         id: string,
-        value: string
+        value: MasterDataValue
     ): Promise<boolean> {
         assertTenantContext('updateItem');
         try {

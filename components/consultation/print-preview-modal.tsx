@@ -4,7 +4,7 @@ import { WebView } from 'react-native-webview';
 import { Icon } from '@/components/ui/Icon';
 import { PRINT_PREVIEW_ICONS } from '@/constants/icons';
 import { PdfService } from '@/services/pdf-service';
-import PdfFilterModal from './pdf-filter-modal';
+import PdfFilterModal, { PdfFilterRenderOptions } from './pdf-filter-modal';
 import FollowupInfoModal, { FollowupInfoSelection } from './followup-info-modal';
 
 interface PrintPreviewModalProps {
@@ -12,7 +12,7 @@ interface PrintPreviewModalProps {
     onClose: () => void;
     onDone: (selection: FollowupInfoSelection) => void;
     onShowFilter: () => void; // This will now keep parent updated if needed
-    onGenerateReport?: (sectionIds: string[]) => void;
+    onGenerateReport?: (sectionIds: string[], renderOptions: PdfFilterRenderOptions) => void;
     htmlContent: string;
     pdfData: any; // The data used to generate the HTML
 }
@@ -32,7 +32,7 @@ export default function PrintPreviewModal({
     const handlePrint = async () => {
         try {
             if (Platform.OS === 'web') {
-                await PdfService.createPdf(pdfData);
+                await PdfService.createPdf(pdfData, pdfData?.__renderOptions);
             } else {
                 // For native, we use expo-print to actually trigger the printer
                 const Print = require('expo-print');
@@ -114,16 +114,20 @@ export default function PrintPreviewModal({
                 <PdfFilterModal
                     visible={isPdfFilterVisible}
                     onClose={() => setIsPdfFilterVisible(false)}
-                    onGenerate={(sectionIds) => {
+                    onGenerate={({ sections, renderOptions }) => {
                         setIsPdfFilterVisible(false);
                         onShowFilter(); // This is now used to trigger re-generation in parent
-                        onGenerateReport?.(sectionIds);
+                        onGenerateReport?.(sections, renderOptions);
                     }}
-                    initialSections={pdfData?.sections?.map((s: any) => ({
+                    initialSections={(pdfData?.__availableSections || pdfData?.sections || []).map((s: any) => ({
                         id: s.id,
                         label: s.title,
-                        enabled: true
-                    })) || []}
+                        enabled: Array.isArray(pdfData?.__selectedSectionIds)
+                            ? pdfData.__selectedSectionIds.includes(s.id)
+                            : true,
+                    }))}
+                    initialRenderOptions={pdfData?.__renderOptions}
+                    allowedRenderOptions={pdfData?.__allowedRenderOptions}
                 />
 
                 <FollowupInfoModal

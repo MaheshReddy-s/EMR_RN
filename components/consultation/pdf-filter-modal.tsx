@@ -9,11 +9,20 @@ export interface FilterSection {
     enabled: boolean;
 }
 
+export interface PdfFilterRenderOptions {
+    includePatientDetails: boolean;
+    includeDoctorDetails: boolean;
+    includeHeaderSection: boolean;
+    includeFooterSection: boolean;
+}
+
 interface PdfFilterModalProps {
     visible: boolean;
     onClose: () => void;
-    onGenerate: (sections: string[]) => void;
+    onGenerate: (payload: { sections: string[]; renderOptions: PdfFilterRenderOptions }) => void;
     initialSections: FilterSection[];
+    initialRenderOptions?: Partial<PdfFilterRenderOptions>;
+    allowedRenderOptions?: Partial<Record<keyof PdfFilterRenderOptions, boolean>>;
 }
 
 export default function PdfFilterModal({
@@ -21,17 +30,26 @@ export default function PdfFilterModal({
     onClose,
     onGenerate,
     initialSections,
+    initialRenderOptions,
+    allowedRenderOptions,
 }: PdfFilterModalProps) {
     const [sections, setSections] = useState<FilterSection[]>(initialSections);
-    const [showPatientDetails, setShowPatientDetails] = useState(true);
-    const [showDoctorDetails, setShowDoctorDetails] = useState(true);
-    const [showHeaderSection, setShowHeaderSection] = useState(true);
-    const [showFooterSection, setShowFooterSection] = useState(true);
+    const [showPatientDetails, setShowPatientDetails] = useState(initialRenderOptions?.includePatientDetails ?? true);
+    const [showDoctorDetails, setShowDoctorDetails] = useState(initialRenderOptions?.includeDoctorDetails ?? true);
+    const [showHeaderSection, setShowHeaderSection] = useState(initialRenderOptions?.includeHeaderSection ?? true);
+    const [showFooterSection, setShowFooterSection] = useState(initialRenderOptions?.includeFooterSection ?? true);
 
     // Keep internal state in sync with props
     React.useEffect(() => {
         setSections(initialSections);
     }, [initialSections]);
+
+    React.useEffect(() => {
+        setShowPatientDetails(initialRenderOptions?.includePatientDetails ?? true);
+        setShowDoctorDetails(initialRenderOptions?.includeDoctorDetails ?? true);
+        setShowHeaderSection(initialRenderOptions?.includeHeaderSection ?? true);
+        setShowFooterSection(initialRenderOptions?.includeFooterSection ?? true);
+    }, [initialRenderOptions, visible]);
 
     const toggleSection = (id: string) => {
         setSections(prev =>
@@ -41,7 +59,15 @@ export default function PdfFilterModal({
 
     const handleApply = () => {
         const enabledIds = sections.filter(s => s.enabled).map(s => s.id);
-        onGenerate(enabledIds);
+        onGenerate({
+            sections: enabledIds,
+            renderOptions: {
+                includePatientDetails: showPatientDetails,
+                includeDoctorDetails: showDoctorDetails,
+                includeHeaderSection: showHeaderSection,
+                includeFooterSection: showFooterSection,
+            },
+        });
     };
 
     return (
@@ -64,39 +90,47 @@ export default function PdfFilterModal({
                         <ScrollView showsVerticalScrollIndicator={false} className="max-h-[70vh]">
                             {/* Meta Sections with Switches */}
                             <View className="mb-2">
-                                <View className="flex-row items-center justify-between py-2 border-b border-gray-50">
-                                    <Text className="text-[17px] text-gray-800">Patient Details</Text>
-                                    <Switch
-                                        value={showPatientDetails}
-                                        onValueChange={setShowPatientDetails}
-                                        trackColor={{ false: '#f0f0f0', true: '#34C759' }}
-                                        thumbColor={Platform.OS === 'ios' ? undefined : '#fff'}
-                                    />
-                                </View>
-                                <View className="flex-row items-center justify-between py-2 border-b border-gray-50">
-                                    <Text className="text-[17px] text-gray-800">Doctor Details</Text>
-                                    <Switch
-                                        value={showDoctorDetails}
-                                        onValueChange={setShowDoctorDetails}
-                                        trackColor={{ false: '#f0f0f0', true: '#34C759' }}
-                                    />
-                                </View>
-                                <View className="flex-row items-center justify-between py-2 border-b border-gray-50">
-                                    <Text className="text-[17px] text-gray-800">Header Section</Text>
-                                    <Switch
-                                        value={showHeaderSection}
-                                        onValueChange={setShowHeaderSection}
-                                        trackColor={{ false: '#f0f0f0', true: '#34C759' }}
-                                    />
-                                </View>
-                                <View className="flex-row items-center justify-between py-2 border-b border-gray-100">
-                                    <Text className="text-[17px] text-gray-800">Footer Section</Text>
-                                    <Switch
-                                        value={showFooterSection}
-                                        onValueChange={setShowFooterSection}
-                                        trackColor={{ false: '#f0f0f0', true: '#34C759' }}
-                                    />
-                                </View>
+                                {allowedRenderOptions?.includePatientDetails !== false ? (
+                                    <View className="flex-row items-center justify-between py-2 border-b border-gray-50">
+                                        <Text className="text-[17px] text-gray-800">Patient Details</Text>
+                                        <Switch
+                                            value={showPatientDetails}
+                                            onValueChange={setShowPatientDetails}
+                                            trackColor={{ false: '#f0f0f0', true: '#34C759' }}
+                                            thumbColor={Platform.OS === 'ios' ? undefined : '#fff'}
+                                        />
+                                    </View>
+                                ) : null}
+                                {allowedRenderOptions?.includeDoctorDetails !== false ? (
+                                    <View className="flex-row items-center justify-between py-2 border-b border-gray-50">
+                                        <Text className="text-[17px] text-gray-800">Doctor Details</Text>
+                                        <Switch
+                                            value={showDoctorDetails}
+                                            onValueChange={setShowDoctorDetails}
+                                            trackColor={{ false: '#f0f0f0', true: '#34C759' }}
+                                        />
+                                    </View>
+                                ) : null}
+                                {allowedRenderOptions?.includeHeaderSection !== false ? (
+                                    <View className="flex-row items-center justify-between py-2 border-b border-gray-50">
+                                        <Text className="text-[17px] text-gray-800">Header Section</Text>
+                                        <Switch
+                                            value={showHeaderSection}
+                                            onValueChange={setShowHeaderSection}
+                                            trackColor={{ false: '#f0f0f0', true: '#34C759' }}
+                                        />
+                                    </View>
+                                ) : null}
+                                {allowedRenderOptions?.includeFooterSection !== false ? (
+                                    <View className="flex-row items-center justify-between py-2 border-b border-gray-100">
+                                        <Text className="text-[17px] text-gray-800">Footer Section</Text>
+                                        <Switch
+                                            value={showFooterSection}
+                                            onValueChange={setShowFooterSection}
+                                            trackColor={{ false: '#f0f0f0', true: '#34C759' }}
+                                        />
+                                    </View>
+                                ) : null}
                             </View>
 
                             {/* List of sections with Radio Buttons */}

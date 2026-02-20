@@ -4,6 +4,7 @@ import {
     Alert,
     Modal,
     Platform,
+    Pressable,
     ScrollView,
     Text,
     TouchableOpacity,
@@ -202,8 +203,11 @@ export function VisitHistoryModal({ visible, onClose, patientId }: VisitHistoryM
 
     return (
         <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-            <View style={styles.modalOverlay}>
-                <View style={[styles.modalContainer, isWeb ? styles.webContainer : styles.nativeContainer]}>
+            <Pressable style={styles.modalOverlay} onPress={onClose}>
+                <Pressable
+                    onPress={(event) => event.stopPropagation()}
+                    style={[styles.modalContainer, isWeb ? styles.webContainer : styles.nativeContainer]}
+                >
 
                     {/* Left Side: PDF Preview (Premium Native feel) */}
                     <View style={styles.leftPane}>
@@ -305,8 +309,8 @@ export function VisitHistoryModal({ visible, onClose, patientId }: VisitHistoryM
                             )}
                         </ScrollView>
                     </View>
-                </View>
-            </View>
+                </Pressable>
+            </Pressable>
         </Modal>
     );
 }

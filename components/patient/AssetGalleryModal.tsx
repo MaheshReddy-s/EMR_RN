@@ -4,6 +4,7 @@ import {
     Image,
     Modal,
     Platform,
+    Pressable,
     ScrollView,
     Text,
     TouchableOpacity,
@@ -309,7 +310,7 @@ export function AssetGalleryModal({
                                                 )}
                                             </View>
                                         ) : (
-                                            <View style={styles.pdfThumbnail}><Icon library="MaterialCommunityIcons" android="file-pdf-box" ios="doc.richtext" size={40} color="#FF3B30" /></View>
+                                            <View style={styles.pdfThumbnail}><View style={{ backgroundColor: "#FF3B30", paddingHorizontal: 16, paddingVertical: 8, borderRadius: 6 }}><Text style={{ color: "white", fontWeight: "bold", fontSize: 18 }}>PDF</Text></View></View>
                                         )}
                                         <View style={styles.filenameContainer}><Text style={styles.filenameText} numberOfLines={2}>{asset.label || 'image.jpg'}</Text></View>
                                     </TouchableOpacity>
@@ -376,11 +377,18 @@ export function AssetGalleryModal({
     return (
         <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
             <GestureHandlerRootView style={{ flex: 1 }}>
-                <View style={styles.modalOverlay}>
-                    {viewState === 'GALLERY' && renderGallery()}
-                    {viewState === 'FULL_SCREEN' && renderFullScreen()}
-                    {viewState === 'COMPARISON' && renderComparison()}
-                </View>
+                {viewState === 'GALLERY' ? (
+                    <Pressable style={styles.modalOverlay} onPress={onClose}>
+                        <Pressable onPress={(event) => event.stopPropagation()}>
+                            {renderGallery()}
+                        </Pressable>
+                    </Pressable>
+                ) : (
+                    <View style={styles.modalOverlay}>
+                        {viewState === 'FULL_SCREEN' && renderFullScreen()}
+                        {viewState === 'COMPARISON' && renderComparison()}
+                    </View>
+                )}
             </GestureHandlerRootView>
         </Modal>
     );
@@ -388,9 +396,9 @@ export function AssetGalleryModal({
 
 const styles = StyleSheet.create({
     modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
-    modalContainer: { backgroundColor: '#F2F2F7', borderRadius: 12, overflow: 'hidden', width: '90%', maxWidth: 700, height: '80%' },
-    webContainer: { maxWidth: 800, height: '80%' },
-    nativeContainer: { height: '80%' },
+    modalContainer: { backgroundColor: '#F2F2F7', borderRadius: 12, overflow: 'hidden', width: '95%', maxWidth: 900, height: '85%' },
+    webContainer: { maxWidth: 1000, height: '85%' },
+    nativeContainer: { height: '85%' },
     header: { backgroundColor: '#007AFF', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, height: 50 },
     headerTitle: { color: 'white', fontSize: 17, fontWeight: '600' },
     headerButtonLeft: { minWidth: 60 },

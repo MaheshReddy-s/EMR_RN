@@ -6,6 +6,7 @@ import {
     KeyboardAvoidingView,
     Modal,
     Platform,
+    Pressable,
     ScrollView,
     Text,
     TextInput,
@@ -294,6 +295,14 @@ export default function PrescriptionEditModal({
         });
     };
 
+    const handleBackdropPress = () => {
+        if (showTypePicker) {
+            setShowTypePicker(false);
+            return;
+        }
+        onClose();
+    };
+
     return (
         <Modal
             visible={visible}
@@ -301,8 +310,9 @@ export default function PrescriptionEditModal({
             transparent={true}
             onRequestClose={onClose}
         >
-            <View className="flex-1 bg-black/50 justify-center items-center px-4 py-8">
-                <KeyboardAvoidingView
+            <Pressable className="flex-1 bg-black/50 justify-center items-center px-4 py-8" onPress={handleBackdropPress}>
+                <Pressable onPress={(event) => event.stopPropagation()}>
+                    <KeyboardAvoidingView
                     behavior={Platform.OS === "ios" ? "padding" : "height"}
                     className="w-full max-w-3xl bg-white rounded-2xl overflow-hidden shadow-2xl flex-1 max-h-[95%]"
                 >
@@ -610,8 +620,9 @@ export default function PrescriptionEditModal({
                             />
                         </View>
                     </ScrollView>
-                </KeyboardAvoidingView>
-            </View>
+                    </KeyboardAvoidingView>
+                </Pressable>
+            </Pressable>
         </Modal >
     );
 }

@@ -55,8 +55,12 @@ interface PdfData {
     date: string;
 }
 
-interface PdfRenderOptions {
-    includeHeaderFooter?: boolean;
+export interface PdfRenderOptions {
+    includeHeaderFooter?: boolean; // backward compatibility
+    includeHeaderSection?: boolean;
+    includeFooterSection?: boolean;
+    includeDoctorDetails?: boolean;
+    includePatientDetails?: boolean;
 }
 
 /**
@@ -96,8 +100,8 @@ export const PdfService = {
      * Generate a PDF from consultation data.
      * Returns the URI of the generated file (native) or null (web).
      */
-    async createPdf(data: PdfData): Promise<string | null> {
-        const htmlContent = buildHtml(data);
+    async createPdf(data: PdfData, options?: PdfRenderOptions): Promise<string | null> {
+        const htmlContent = buildHtml(data, options);
 
         if (Platform.OS === 'web') {
             const printWindow = window.open('', '_blank');
@@ -147,12 +151,12 @@ export const PdfService = {
      * Generate, encrypt and save a PDF file.
      * Returns the URI of the ENCRYPTED file.
      */
-    async createEncryptedPdf(data: PdfData): Promise<string | null> {
+    async createEncryptedPdf(data: PdfData, options?: PdfRenderOptions): Promise<string | null> {
         if (Platform.OS === 'web') return null; // Web print doesn't use encryption path
 
         try {
             // 1. Generate local PDF
-            const rawUri = await this.createPdf(data);
+            const rawUri = await this.createPdf(data, options);
             if (!rawUri) return null;
 
             // 2. Read PDF bytes
@@ -236,7 +240,10 @@ function normalizeDurationForDisplay(duration: string | undefined): string {
 
 function buildHtml(data: PdfData, options?: PdfRenderOptions): string {
     const { patient, doctor, sections, date, followUpDate } = data;
-    const includeHeaderFooter = options?.includeHeaderFooter !== false;
+    const includeHeaderSection = options?.includeHeaderSection ?? (options?.includeHeaderFooter !== false);
+    const includeFooterSection = options?.includeFooterSection ?? (options?.includeHeaderFooter !== false);
+    const includeDoctorDetails = options?.includeDoctorDetails ?? (options?.includeHeaderFooter !== false);
+    const includePatientDetails = options?.includePatientDetails ?? (options?.includeHeaderFooter !== false);
 
     const sectionsHtml = sections
         .filter((s) => s.items.length > 0)
@@ -344,15 +351,19 @@ function buildHtml(data: PdfData, options?: PdfRenderOptions): string {
 
             /* Header Section */
             .header {
-                padding: 10px 20px;
-                margin-bottom: 25px;
+                padding: 10px 20px 0;
+                margin-bottom: 12px;
             }
-            .clinic-row { display: flex; align-items: center; margin-bottom: 12px; }
+            .clinic-row { display: flex; align-items: center; }
             .clinic-logo { width: 65px; height: 65px; margin-right: 18px; object-fit: contain; }
             .clinic-details { display: flex; flex-direction: column; }
             .clinic-name { font-size: 20px; font-weight: 700; color: #111; }
             .clinic-address { font-size: 13.5px; color: #8a8a8a; }
 
+            .meta-block {
+                padding: 0 20px;
+                margin-bottom: 25px;
+            }
             .doctor-details { margin-bottom: 20px; font-size: 13.5px; }
             .doc-line { font-weight: 700; margin-bottom: 2px; }
 
@@ -361,10 +372,10 @@ function buildHtml(data: PdfData, options?: PdfRenderOptions): string {
                 grid-template-columns: 1.3fr 1.2fr 0.5fr;
                 gap: 15px;
                 font-size: 13px;
-                margin-top: 15px;
                 border-top: 1px solid #eee;
                 padding-top: 10px;
             }
+            .doctor-details + .patient-grid { margin-top: 15px; }
             .info-label { font-weight: 700; }
 
             /* Section Styling */
@@ -503,16 +514,12 @@ function buildHtml(data: PdfData, options?: PdfRenderOptions): string {
             .date-area { font-size: 14px; font-weight: 700; }
             .sig-area { text-align: right; }
             .sig-placeholder { width: 150px; height: 35px; margin-left: auto; }
+            .sig-image { height: 75px; max-width: 250px; margin-left: auto; margin-bottom: 5px; object-fit: contain; display: block; }
             .sig-name { font-weight: 700; font-size: 14px; }
-            ${includeHeaderFooter ? '' : `
-            .header { display: none; }
-            .footer { display: none; }
-            main { padding-top: 6px; }
-            `}
         </style>
     </head>
     <body>
-        ${includeHeaderFooter ? `
+        ${includeHeaderSection ? `
         <div class="header">
             <div class="clinic-row">
                 ${clinicLogo ? `<img src="${clinicLogo}" class="clinic-logo" />` : ''}
@@ -521,13 +528,20 @@ function buildHtml(data: PdfData, options?: PdfRenderOptions): string {
                     <span class="clinic-address">${clinicAddress}</span>
                 </div>
             </div>
+        </div>
+        ` : ''}
 
+        ${(includeDoctorDetails || includePatientDetails) ? `
+        <div class="meta-block">
+            ${includeDoctorDetails ? `
             <div class="doctor-details">
                 <div class="doc-line">${doctorFullName} ${qualifications}</div>
                 <div class="doc-line">${designation}</div>
                 <div class="doc-line">Registration No : ${regNo}</div>
             </div>
+            ` : ''}
 
+            ${includePatientDetails ? `
             <div class="patient-grid">
                 <div>
                     <div class="info-item"><span class="info-label">Patient Name:</span> ${getGenderPrefix(patient.gender)}${escapeHtml(patient.patient_name)}</div>
@@ -542,6 +556,7 @@ function buildHtml(data: PdfData, options?: PdfRenderOptions): string {
                     <div class="info-item"><span class="info-label">Age:</span> ${escapeHtml(patient.age != null ? String(patient.age) : null) || '---'}</div>
                 </div>
             </div>
+            ` : ''}
         </div>
         ` : ''}
 
@@ -550,13 +565,17 @@ function buildHtml(data: PdfData, options?: PdfRenderOptions): string {
             ${nextConsultationDateHtml}
         </main>
 
-        ${includeHeaderFooter ? `
+        ${includeFooterSection ? `
         <footer class="footer">
             <div class="date-area">
                 Date: ${date}
             </div>
             <div class="sig-area">
+                ${doctor.signature && typeof doctor.signature === 'string' && doctor.signature.length > 0 ? `
+                <img src="${doctor.signature.startsWith('data:') ? doctor.signature : `data:image/png;base64,${doctor.signature}`}" class="sig-image" />
+                ` : `
                 <div class="sig-placeholder"></div>
+                `}
                 <div class="sig-name">${doctorFullName} ${qualifications}</div>
             </div>
         </footer>

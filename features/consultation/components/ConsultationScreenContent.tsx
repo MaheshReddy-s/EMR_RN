@@ -3,6 +3,7 @@ import {
     ActivityIndicator,
     Alert,
     Modal,
+    Pressable,
     ScrollView,
     Text,
     TextInput,
@@ -17,6 +18,7 @@ import FollowUpModal from '@/components/consultation/follow-up-modal';
 import PrescriptionModal, { PrescriptionData } from '@/components/consultation/prescription-modal';
 import PrescriptionEditModal from '@/components/consultation/prescription-edit-modal';
 import PrintPreviewModal from '@/components/consultation/print-preview-modal';
+import type { PdfFilterRenderOptions } from '@/components/consultation/pdf-filter-modal';
 import type { FollowupInfoSelection } from '@/components/consultation/followup-info-modal';
 import { VisitHistoryModal } from '@/components/patient/VisitHistoryModal';
 import { AssetGalleryModal } from '@/components/patient/AssetGalleryModal';
@@ -26,7 +28,9 @@ import { CONSULTATION_ICONS, DASHBOARD_ICONS } from '@/constants/icons';
 import type { ConsultationSuggestion } from '@/features/consultation/hooks/useConsultationSuggestions';
 
 const DEFAULT_PEN_COLOR = '#1a365d';
-const DEFAULT_PEN_THICKNESS = 1.5;
+const CANVAS_FILL_STYLE = { flex: 1 };
+const CONSULTATION_PEN_THICKNESS_FACTOR = 0.6;
+const MIN_CONSULTATION_PEN_THICKNESS = 0.5;
 
 const TABS: { id: TabType; label: string }[] = [
     { id: 'instruction', label: 'Instruction' },
@@ -67,9 +71,9 @@ interface ConsultationScreenContentProps {
     onClearAll: (section: TabType) => void;
     elapsedTime: string;
 
-    isDrawingActive: boolean;
-    onDrawingActive: (active: boolean) => void;
+    onDrawingActive?: (active: boolean) => void;
     scrollViewRef: React.RefObject<ScrollView | null>;
+    penThickness: number;
 
     complaints: ConsultationItem[];
     diagnoses: ConsultationItem[];
@@ -100,7 +104,7 @@ interface ConsultationScreenContentProps {
     isPrintPreviewVisible: boolean;
     setIsPrintPreviewVisible: (visible: boolean) => void;
     onSaveConsultation: (selection: FollowupInfoSelection) => Promise<void>;
-    onGeneratePdfReport: (enabledSectionIds: string[]) => Promise<void>;
+    onGeneratePdfReport: (enabledSectionIds: string[], renderOptions: PdfFilterRenderOptions) => Promise<void>;
     previewHtml: string;
     previewData: any;
 
@@ -132,7 +136,133 @@ interface ConsultationScreenContentProps {
     onDeleteProperty: (suggestion: ConsultationSuggestion) => void;
 }
 
+interface ConsultationRowCanvasProps {
+    item: ConsultationItem;
+    index: number;
+    sectionKey: TabType;
+    penThickness: number;
+    onDrawingActive?: (active: boolean) => void;
+    onExpandRow: (section: TabType, id: string) => void;
+    onRemoveItem: (section: TabType, id: string) => void;
+    onStrokesChange: (section: TabType, id: string, strokes: any[]) => void;
+    onEditRow: (section: TabType, item: ConsultationItem) => void;
+    onClearRow: (section: TabType, id: string) => void;
+}
+
+const ConsultationRowCanvas = React.memo(function ConsultationRowCanvas({
+    item,
+    index,
+    sectionKey,
+    penThickness,
+    onDrawingActive,
+    onExpandRow,
+    onRemoveItem,
+    onStrokesChange,
+    onEditRow,
+    onClearRow,
+}: ConsultationRowCanvasProps) {
+    const handleExpand = React.useCallback(() => onExpandRow(sectionKey, item.id), [onExpandRow, sectionKey, item.id]);
+    const handleDelete = React.useCallback(() => onRemoveItem(sectionKey, item.id), [onRemoveItem, sectionKey, item.id]);
+    const handleStrokeChange = React.useCallback((strokes: any[]) => onStrokesChange(sectionKey, item.id, strokes), [onStrokesChange, sectionKey, item.id]);
+    const handleEdit = React.useCallback(() => onEditRow(sectionKey, item), [onEditRow, sectionKey, item]);
+    const handleClear = React.useCallback(() => onClearRow(sectionKey, item.id), [onClearRow, sectionKey, item.id]);
+
+    return (
+        <DrawingCanvas
+            index={index}
+            prescription={item}
+            onExpand={handleExpand}
+            onDelete={handleDelete}
+            onStrokesChange={handleStrokeChange}
+            initialDrawings={item.drawings}
+            penColor={DEFAULT_PEN_COLOR}
+            penThickness={penThickness}
+            isErasing={false}
+            onDrawingActive={onDrawingActive}
+            onEdit={handleEdit}
+            onClear={handleClear}
+            showIndex={sectionKey === 'prescriptions'}
+            isFullWidth={sectionKey !== 'prescriptions'}
+        />
+    );
+}, (prev, next) =>
+    prev.item === next.item &&
+    prev.index === next.index &&
+    prev.sectionKey === next.sectionKey &&
+    prev.penThickness === next.penThickness &&
+    prev.onDrawingActive === next.onDrawingActive
+);
+
+interface ConsultationSectionBlockProps {
+    title: string;
+    sectionKey: TabType;
+    items: ConsultationItem[];
+    penThickness: number;
+    onDrawingActive?: (active: boolean) => void;
+    clearSection: (section: TabType) => void;
+    onExpandRow: (section: TabType, id: string) => void;
+    onRemoveItem: (section: TabType, id: string) => void;
+    onStrokesChange: (section: TabType, id: string, strokes: any[]) => void;
+    onEditRow: (section: TabType, item: ConsultationItem) => void;
+    onClearRow: (section: TabType, id: string) => void;
+}
+
+const ConsultationSectionBlock = React.memo(function ConsultationSectionBlock({
+    title,
+    sectionKey,
+    items,
+    penThickness,
+    onDrawingActive,
+    clearSection,
+    onExpandRow,
+    onRemoveItem,
+    onStrokesChange,
+    onEditRow,
+    onClearRow,
+}: ConsultationSectionBlockProps) {
+    if (items.length === 0) return null;
+
+    const handleClearSection = React.useCallback(() => clearSection(sectionKey), [clearSection, sectionKey]);
+
+    return (
+        <View className="mb-4">
+            <View className="flex-row px-4 py-2 bg-[#F2F4F8] border-b border-gray-200">
+                <Text className="text-black font-bold text-base">{title}</Text>
+                <TouchableOpacity onPress={handleClearSection}>
+                    <Icon icon={CONSULTATION_ICONS.trashOutline} size={24} color="#FF3B30" />
+                </TouchableOpacity>
+            </View>
+            {items.map((item, index) => (
+                <ConsultationRowCanvas
+                    key={item.id}
+                    item={item}
+                    index={index}
+                    sectionKey={sectionKey}
+                    penThickness={penThickness}
+                    onDrawingActive={onDrawingActive}
+                    onExpandRow={onExpandRow}
+                    onRemoveItem={onRemoveItem}
+                    onStrokesChange={onStrokesChange}
+                    onEditRow={onEditRow}
+                    onClearRow={onClearRow}
+                />
+            ))}
+        </View>
+    );
+}, (prev, next) =>
+    prev.title === next.title &&
+    prev.sectionKey === next.sectionKey &&
+    prev.items === next.items &&
+    prev.penThickness === next.penThickness &&
+    prev.onDrawingActive === next.onDrawingActive
+);
+
 export function ConsultationScreenContent(props: ConsultationScreenContentProps) {
+    const effectivePenThickness = Math.max(
+        MIN_CONSULTATION_PEN_THICKNESS,
+        props.penThickness * CONSULTATION_PEN_THICKNESS_FACTOR
+    );
+
     const renderSuggestionChip = (suggestion: ConsultationSuggestion) => (
         <TouchableOpacity
             key={suggestion.id}
@@ -152,43 +282,6 @@ export function ConsultationScreenContent(props: ConsultationScreenContentProps)
             </Text>
         </TouchableOpacity>
     );
-
-    const renderSectionRows = (items: ConsultationItem[], title: string, sectionKey: TabType) => {
-        if (items.length === 0) return null;
-
-        return (
-            <View className="mb-4">
-                <View className="flex-row px-4 py-2 bg-[#F2F4F8] border-b border-gray-200">
-                    <Text className="text-black font-bold text-base">{title}</Text>
-                    <TouchableOpacity onPress={() => props.clearSection(sectionKey)}>
-                        <Icon icon={CONSULTATION_ICONS.trashOutline} size={24} color="#FF3B30" />
-                    </TouchableOpacity>
-                </View>
-                {items.map((item, index) => (
-                    <DrawingCanvas
-                        key={item.id}
-                        index={index}
-                        prescription={{
-                            ...item,
-                            height: item.height,
-                        }}
-                        onExpand={() => props.onExpandRow(sectionKey, item.id)}
-                        onDelete={() => props.removeItem(sectionKey, item.id)}
-                        onStrokesChange={(strokes) => props.onStrokesChange(sectionKey, item.id, strokes)}
-                        initialDrawings={item.drawings}
-                        penColor={DEFAULT_PEN_COLOR}
-                        penThickness={DEFAULT_PEN_THICKNESS}
-                        isErasing={false}
-                        onDrawingActive={props.onDrawingActive}
-                        onEdit={() => props.onEditRow(sectionKey, item)}
-                        onClear={() => props.onClearRow(sectionKey, item.id)}
-                        showIndex={sectionKey === 'prescriptions'}
-                        isFullWidth={sectionKey !== 'prescriptions'}
-                    />
-                ))}
-            </View>
-        );
-    };
 
     return (
         <View className="flex-1 bg-white" style={props.isWeb ? { alignItems: 'center' } : { flex: 1, width: '100%' }}>
@@ -276,15 +369,13 @@ export function ConsultationScreenContent(props: ConsultationScreenContentProps)
                         <View className="flex-1 bg-white border border-gray-100 rounded-2xl h-32 shadow-sm relative overflow-hidden" style={{ elevation: 3, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 10 }}>
                             <View className="absolute inset-0 z-10" pointerEvents="box-none">
                                 <DrawingCanvas
-                                    key={`input-canvas-${props.currentInputStrokes.length}`}
                                     canvasOnly
                                     initialDrawings={props.currentInputStrokes}
                                     onStrokesChange={props.onCurrentInputStrokesChange}
                                     penColor={DEFAULT_PEN_COLOR}
-                                    penThickness={DEFAULT_PEN_THICKNESS}
+                                    penThickness={effectivePenThickness}
                                     isErasing={false}
-                                    onDrawingActive={props.onDrawingActive}
-                                    style={{ flex: 1 }}
+                                    style={CANVAS_FILL_STYLE}
                                 />
                             </View>
 
@@ -327,17 +418,128 @@ export function ConsultationScreenContent(props: ConsultationScreenContentProps)
                     ref={props.scrollViewRef}
                     className="flex-1 bg-white"
                     contentContainerStyle={{ paddingBottom: 100 }}
-                    scrollEnabled={!props.isDrawingActive}
                 >
                     <View className="mt-2">
-                        {(props.activeTab === 'complaints' || props.complaints.length > 0) && renderSectionRows(props.complaints, 'Complaints', 'complaints')}
-                        {(props.activeTab === 'diagnosis' || props.diagnoses.length > 0) && renderSectionRows(props.diagnoses, 'Diagnosis', 'diagnosis')}
-                        {(props.activeTab === 'examination' || props.examinations.length > 0) && renderSectionRows(props.examinations, 'Examination', 'examination')}
-                        {(props.activeTab === 'investigation' || props.investigations.length > 0) && renderSectionRows(props.investigations, 'Investigation', 'investigation')}
-                        {(props.activeTab === 'procedure' || props.procedures.length > 0) && renderSectionRows(props.procedures, 'Procedure', 'procedure')}
-                        {(props.activeTab === 'prescriptions' || props.prescriptions.length > 0) && renderSectionRows(props.prescriptions, 'Prescriptions', 'prescriptions')}
-                        {(props.activeTab === 'instruction' || props.instructions.length > 0) && renderSectionRows(props.instructions, 'Instruction', 'instruction')}
-                        {(props.activeTab === 'notes' || props.notes.length > 0) && renderSectionRows(props.notes, 'Notes', 'notes')}
+                        {(props.activeTab === 'complaints' || props.complaints.length > 0) && (
+                            <ConsultationSectionBlock
+                                title="Complaints"
+                                sectionKey="complaints"
+                                items={props.complaints}
+                                penThickness={effectivePenThickness}
+                                onDrawingActive={props.onDrawingActive}
+                                clearSection={props.clearSection}
+                                onExpandRow={props.onExpandRow}
+                                onRemoveItem={props.removeItem}
+                                onStrokesChange={props.onStrokesChange}
+                                onEditRow={props.onEditRow}
+                                onClearRow={props.onClearRow}
+                            />
+                        )}
+                        {(props.activeTab === 'diagnosis' || props.diagnoses.length > 0) && (
+                            <ConsultationSectionBlock
+                                title="Diagnosis"
+                                sectionKey="diagnosis"
+                                items={props.diagnoses}
+                                penThickness={effectivePenThickness}
+                                onDrawingActive={props.onDrawingActive}
+                                clearSection={props.clearSection}
+                                onExpandRow={props.onExpandRow}
+                                onRemoveItem={props.removeItem}
+                                onStrokesChange={props.onStrokesChange}
+                                onEditRow={props.onEditRow}
+                                onClearRow={props.onClearRow}
+                            />
+                        )}
+                        {(props.activeTab === 'examination' || props.examinations.length > 0) && (
+                            <ConsultationSectionBlock
+                                title="Examination"
+                                sectionKey="examination"
+                                items={props.examinations}
+                                penThickness={effectivePenThickness}
+                                onDrawingActive={props.onDrawingActive}
+                                clearSection={props.clearSection}
+                                onExpandRow={props.onExpandRow}
+                                onRemoveItem={props.removeItem}
+                                onStrokesChange={props.onStrokesChange}
+                                onEditRow={props.onEditRow}
+                                onClearRow={props.onClearRow}
+                            />
+                        )}
+                        {(props.activeTab === 'investigation' || props.investigations.length > 0) && (
+                            <ConsultationSectionBlock
+                                title="Investigation"
+                                sectionKey="investigation"
+                                items={props.investigations}
+                                penThickness={effectivePenThickness}
+                                onDrawingActive={props.onDrawingActive}
+                                clearSection={props.clearSection}
+                                onExpandRow={props.onExpandRow}
+                                onRemoveItem={props.removeItem}
+                                onStrokesChange={props.onStrokesChange}
+                                onEditRow={props.onEditRow}
+                                onClearRow={props.onClearRow}
+                            />
+                        )}
+                        {(props.activeTab === 'procedure' || props.procedures.length > 0) && (
+                            <ConsultationSectionBlock
+                                title="Procedure"
+                                sectionKey="procedure"
+                                items={props.procedures}
+                                penThickness={effectivePenThickness}
+                                onDrawingActive={props.onDrawingActive}
+                                clearSection={props.clearSection}
+                                onExpandRow={props.onExpandRow}
+                                onRemoveItem={props.removeItem}
+                                onStrokesChange={props.onStrokesChange}
+                                onEditRow={props.onEditRow}
+                                onClearRow={props.onClearRow}
+                            />
+                        )}
+                        {(props.activeTab === 'prescriptions' || props.prescriptions.length > 0) && (
+                            <ConsultationSectionBlock
+                                title="Prescriptions"
+                                sectionKey="prescriptions"
+                                items={props.prescriptions}
+                                penThickness={effectivePenThickness}
+                                onDrawingActive={props.onDrawingActive}
+                                clearSection={props.clearSection}
+                                onExpandRow={props.onExpandRow}
+                                onRemoveItem={props.removeItem}
+                                onStrokesChange={props.onStrokesChange}
+                                onEditRow={props.onEditRow}
+                                onClearRow={props.onClearRow}
+                            />
+                        )}
+                        {(props.activeTab === 'instruction' || props.instructions.length > 0) && (
+                            <ConsultationSectionBlock
+                                title="Instruction"
+                                sectionKey="instruction"
+                                items={props.instructions}
+                                penThickness={effectivePenThickness}
+                                onDrawingActive={props.onDrawingActive}
+                                clearSection={props.clearSection}
+                                onExpandRow={props.onExpandRow}
+                                onRemoveItem={props.removeItem}
+                                onStrokesChange={props.onStrokesChange}
+                                onEditRow={props.onEditRow}
+                                onClearRow={props.onClearRow}
+                            />
+                        )}
+                        {(props.activeTab === 'notes' || props.notes.length > 0) && (
+                            <ConsultationSectionBlock
+                                title="Notes"
+                                sectionKey="notes"
+                                items={props.notes}
+                                penThickness={effectivePenThickness}
+                                onDrawingActive={props.onDrawingActive}
+                                clearSection={props.clearSection}
+                                onExpandRow={props.onExpandRow}
+                                onRemoveItem={props.removeItem}
+                                onStrokesChange={props.onStrokesChange}
+                                onEditRow={props.onEditRow}
+                                onClearRow={props.onClearRow}
+                            />
+                        )}
                     </View>
                 </ScrollView>
 
@@ -416,8 +618,11 @@ export function ConsultationScreenContent(props: ConsultationScreenContentProps)
                     animationType="fade"
                     onRequestClose={() => props.setIsEditModalVisible(false)}
                 >
-                    <View className="flex-1 bg-black/40 justify-center items-center px-4">
-                        <View className="bg-white w-full max-w-[400px] rounded-2xl overflow-hidden shadow-xl">
+                    <Pressable className="flex-1 bg-black/40 justify-center items-center px-4" onPress={() => props.setIsEditModalVisible(false)}>
+                        <Pressable
+                            onPress={(event) => event.stopPropagation()}
+                            className="bg-white w-full max-w-[400px] rounded-2xl overflow-hidden shadow-xl"
+                        >
                             <View className="bg-gray-50 px-5 py-4 border-b border-gray-100 flex-row justify-between items-center">
                                 <Text className="text-gray-900 text-lg font-bold">{props.editModalTitle}</Text>
                                 <TouchableOpacity onPress={() => props.setIsEditModalVisible(false)}>
@@ -450,8 +655,8 @@ export function ConsultationScreenContent(props: ConsultationScreenContentProps)
                                     </TouchableOpacity>
                                 </View>
                             </View>
-                        </View>
-                    </View>
+                        </Pressable>
+                    </Pressable>
                 </Modal>
             </View>
         </View>

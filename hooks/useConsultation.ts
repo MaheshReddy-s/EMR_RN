@@ -42,6 +42,14 @@ export const SECTION_KEYS: TabType[] = [
     'procedure', 'prescriptions', 'instruction', 'notes',
 ];
 
+function formatElapsedTime(elapsedMs: number): string {
+    const safeElapsed = Math.max(0, elapsedMs);
+    const hours = Math.floor(safeElapsed / 3_600_000);
+    const minutes = Math.floor((safeElapsed % 3_600_000) / 60_000);
+    const seconds = Math.floor((safeElapsed % 60_000) / 1_000);
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+}
+
 // ─── REDUCER ─────────────────────────────────────────────────
 function consultationReducer(state: ConsultationState, action: Action): ConsultationState {
     switch (action.type) {
@@ -111,53 +119,71 @@ function consultationReducer(state: ConsultationState, action: Action): Consulta
 export function useConsultation() {
     const [state, dispatch] = useReducer(consultationReducer, initialState);
 
-    // Ref to hold sessionStartTime for timer closure — avoids capturing stale state
+    // Keep latest session start timestamp outside closures.
     const sessionStartRef = useRef(state.sessionStartTime);
     sessionStartRef.current = state.sessionStartTime;
+    const timerIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    const isTimerRunningRef = useRef(false);
 
-    // Timer Logic — uses ref to avoid re-subscribing every second
+    const updateTimer = useCallback(() => {
+        dispatch({
+            type: 'UPDATE_TIMER',
+            time: formatElapsedTime(Date.now() - sessionStartRef.current),
+        });
+    }, []);
+
+    const stopTimer = useCallback(() => {
+        isTimerRunningRef.current = false;
+        if (timerIntervalRef.current) {
+            clearInterval(timerIntervalRef.current);
+            timerIntervalRef.current = null;
+        }
+    }, []);
+
+    const startTimer = useCallback(() => {
+        if (isTimerRunningRef.current && timerIntervalRef.current) return;
+
+        isTimerRunningRef.current = true;
+        if (timerIntervalRef.current) {
+            clearInterval(timerIntervalRef.current);
+        }
+        updateTimer();
+        timerIntervalRef.current = setInterval(updateTimer, 1000);
+    }, [updateTimer]);
+
+    const resetSession = useCallback(() => {
+        const now = Date.now();
+        sessionStartRef.current = now;
+        dispatch({ type: 'RESET_SESSION' });
+        dispatch({ type: 'UPDATE_TIMER', time: '00:00:00' });
+    }, []);
+
+    // Pause interval when app is backgrounded. Resume only if timer is marked running.
     useEffect(() => {
-        let interval: ReturnType<typeof setInterval> | null = null;
-
-        const updateTimer = () => {
-            const diff = Date.now() - sessionStartRef.current;
-            const hours = Math.floor(diff / 3600000);
-            const minutes = Math.floor((diff % 3600000) / 60000);
-            const seconds = Math.floor((diff % 60000) / 1000);
-            dispatch({
-                type: 'UPDATE_TIMER',
-                time: `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
-            });
-        };
-
-        const startTimer = () => {
-            if (interval) return;
-            updateTimer();
-            interval = setInterval(updateTimer, 1000);
-        };
-
-        const stopTimer = () => {
-            if (interval) {
-                clearInterval(interval);
-                interval = null;
-            }
-        };
-
         const subscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
             if (nextAppState === 'active') {
-                startTimer();
-            } else {
-                stopTimer();
+                if (isTimerRunningRef.current && !timerIntervalRef.current) {
+                    updateTimer();
+                    timerIntervalRef.current = setInterval(updateTimer, 1000);
+                }
+                return;
+            }
+
+            if (timerIntervalRef.current) {
+                clearInterval(timerIntervalRef.current);
+                timerIntervalRef.current = null;
             }
         });
 
-        startTimer();
-
         return () => {
-            stopTimer();
+            if (timerIntervalRef.current) {
+                clearInterval(timerIntervalRef.current);
+                timerIntervalRef.current = null;
+            }
+            isTimerRunningRef.current = false;
             subscription.remove();
         };
-    }, []); // Empty deps — sessionStartRef avoids stale closure
+    }, [updateTimer]);
 
     // ─── Stable action callbacks (useCallback prevents child re-renders) ───
     const addItem = useCallback((section: TabType, item: ConsultationItem) =>
@@ -183,6 +209,9 @@ export function useConsultation() {
 
     return {
         state,
+        startTimer,
+        stopTimer,
+        resetSession,
         addItem,
         removeItem,
         updateItem,

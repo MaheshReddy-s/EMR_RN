@@ -1,11 +1,14 @@
 import { Icon } from '@/components/ui/Icon';
-import { SETTINGS_ICONS } from '@/constants/icons';
+import { CONSULTATION_ICONS, SETTINGS_ICONS } from '@/constants/icons';
+import { DrawingCanvas, StrokeData } from '@/components/consultation/drawing-canvas';
 import type { User } from '@/entities';
 import { AuthRepository } from '@/repositories';
 import React, { useEffect, useState } from 'react';
+import { Skia, PaintStyle, StrokeCap, StrokeJoin, ImageFormat } from '@shopify/react-native-skia';
 import {
     ActivityIndicator,
     Alert,
+    Image,
     KeyboardAvoidingView,
     Modal,
     Platform,
@@ -30,10 +33,64 @@ interface DoctorProfileModalProps {
  * Fields: prefix, first_name, last_name, email (read-only), qualification,
  *         registration_no, department, designation, gender, age, phone_no
  */
+
+const encodeStrokesToBase64 = (strokes: StrokeData[]): string => {
+    if (!strokes || strokes.length === 0) return '';
+
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+
+    strokes.forEach(s => {
+        if (!s.svg) return;
+        const path = Skia.Path.MakeFromSVGString(s.svg);
+        if (path) {
+            const pb = path.computeTightBounds();
+            const halfWidth = (s.width || 2) / 2;
+            minX = Math.min(minX, pb.x - halfWidth);
+            minY = Math.min(minY, pb.y - halfWidth);
+            maxX = Math.max(maxX, pb.x + pb.width + halfWidth);
+            maxY = Math.max(maxY, pb.y + pb.height + halfWidth);
+        }
+    });
+
+    if (minX === Infinity) return '';
+
+    const padding = 20;
+    const width = Math.max(1, maxX - minX + padding * 2);
+    const height = Math.max(1, maxY - minY + padding * 2);
+
+    const surface = Skia.Surface.Make(width, height);
+    if (!surface) return '';
+    const canvas = surface.getCanvas();
+    canvas.clear(Skia.Color('transparent'));
+
+    canvas.translate(-minX + padding, -minY + padding);
+
+    strokes.forEach(s => {
+        if (!s.svg) return;
+        const path = Skia.Path.MakeFromSVGString(s.svg);
+        if (path) {
+            const paint = Skia.Paint();
+            paint.setStyle(PaintStyle.Stroke);
+            paint.setColor(Skia.Color(s.color));
+            paint.setStrokeWidth(s.width || 2);
+            paint.setStrokeCap(StrokeCap.Round);
+            paint.setStrokeJoin(StrokeJoin.Round);
+            canvas.drawPath(path, paint);
+        }
+    });
+
+    const image = surface.makeImageSnapshot();
+    const base64 = image.encodeToBase64(ImageFormat.PNG, 100);
+    return `data:image/png;base64,${base64}`;
+}
+
 export function DoctorProfileModal({ visible, onClose, user, onSave }: DoctorProfileModalProps) {
     const isWeb = Platform.OS === 'web';
     const [isSaving, setIsSaving] = useState(false);
-    const [formData, setFormData] = useState<Partial<User & { prefix?: string }>>({});
+    const [formData, setFormData] = useState<Partial<User & { prefix?: string, signature?: any }>>({});
 
     // Dropdown state
     const [activeDropdown, setActiveDropdown] = useState<{
@@ -56,6 +113,7 @@ export function DoctorProfileModal({ visible, onClose, user, onSave }: DoctorPro
                 age: user.age || '',
                 prefix: (user as any).prefix || 'Dr.',
                 phone_no: user.phone_no || '',
+                signature: user.signature || '',
             });
         }
     }, [visible, user]);
@@ -93,9 +151,18 @@ export function DoctorProfileModal({ visible, onClose, user, onSave }: DoctorPro
                 phone_no: formData.phone_no,
             };
 
-            const response = await AuthRepository.updateDoctorProfile(payload);
+            let finalSignature = formData.signature || '';
+            if (Array.isArray(formData.signature) && formData.signature.length > 0) {
+                finalSignature = encodeStrokesToBase64(formData.signature);
+            } else if (Array.isArray(formData.signature) && formData.signature.length === 0) {
+                finalSignature = '';
+            }
+
+            const payloadWithSignature = { ...payload, signature: finalSignature };
+
+            const response = await AuthRepository.updateDoctorProfile(payloadWithSignature);
             const updatedData = response?.data || response;
-            const updatedUser = { ...user, ...updatedData, ...payload } as User;
+            const updatedUser = { ...user, ...updatedData, ...payload, signature: finalSignature } as User;
 
             onSave?.(updatedUser);
             onClose();
@@ -192,6 +259,14 @@ export function DoctorProfileModal({ visible, onClose, user, onSave }: DoctorPro
         );
     };
 
+    const handleBackdropPress = () => {
+        if (activeDropdown) {
+            setActiveDropdown(null);
+            return;
+        }
+        onClose();
+    };
+
     return (
         <Modal
             animationType="fade"
@@ -205,89 +280,146 @@ export function DoctorProfileModal({ visible, onClose, user, onSave }: DoctorPro
                 onClose();
             }}
         >
-            <View className="flex-1 justify-center items-center bg-black/40 px-4">
-                <KeyboardAvoidingView
-                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                    className={`w-full ${isWeb ? 'max-w-4xl' : 'max-w-[500px]'} bg-white rounded-3xl shadow-xl overflow-hidden`}
-                >
-                    {/* Header — matches Swift navigation bar with Cancel and Done */}
-                    <View className="flex-row items-center justify-between px-6 py-4 border-b border-gray-100">
-                        <TouchableOpacity onPress={onClose} className="p-2">
-                            <Text className="text-[#007AFF] text-[17px]">Cancel</Text>
-                        </TouchableOpacity>
-                        <Text className="text-gray-900 text-[18px] font-bold">Edit Profile</Text>
-                        <TouchableOpacity onPress={handleSave} disabled={isSaving} className="p-2">
-                            {isSaving ? (
-                                <ActivityIndicator size="small" color="#007AFF" />
-                            ) : (
-                                <Text className="text-[#007AFF] text-[17px] font-semibold">Done</Text>
-                            )}
-                        </TouchableOpacity>
-                    </View>
-
-                    <ScrollView
-                        showsVerticalScrollIndicator={false}
-                        className="py-6 max-h-[80vh]"
-                        keyboardShouldPersistTaps="handled"
+            <KeyboardAvoidingView
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                className="flex-1"
+            >
+                <Pressable className="flex-1 justify-center items-center bg-black/40 px-4 py-8" onPress={handleBackdropPress}>
+                    <Pressable
+                        onPress={(event) => event.stopPropagation()}
+                        className={`w-full ${isWeb ? 'max-w-4xl' : 'max-w-[500px]'} bg-white rounded-3xl shadow-xl overflow-hidden`}
+                        style={{ maxHeight: '100%' }}
                     >
-                        <View className={isWeb ? "flex-row flex-wrap px-4" : ""}>
-                            {/* Row 1: Prefix + First Name + Last Name */}
-                            {renderField('Prefix', formData.prefix || '', 'prefix', 'Dr.', {
-                                isDropdown: true,
-                                dropdownOptions: ['Dr.', 'Mr.', 'Mrs.', 'Ms.'],
-                                webWidth: 'w-1/6',
-                            })}
-                            {renderField('First Name', formData.first_name || '', 'first_name', 'First name', {
-                                webWidth: 'w-5/12',
-                            })}
-                            {renderField('Last Name', formData.last_name || '', 'last_name', 'Last name', {
-                                webWidth: 'w-5/12',
-                            })}
-
-                            {/* Row 2: Email (read-only) + Phone */}
-                            {renderField('Email', formData.email || '', 'email', 'Email', {
-                                keyboardType: 'email-address',
-                                readOnly: true,
-                                webWidth: 'w-1/2',
-                            })}
-                            {renderField('Phone', formData.phone_no || '', 'phone_no', 'Phone number', {
-                                keyboardType: 'phone-pad',
-                                maxLength: 10,
-                                webWidth: 'w-1/2',
-                            })}
-
-                            {/* Row 3: Qualification + Registration No */}
-                            {renderField('Qualification', formData.qualification || '', 'qualification', 'MBBS, MD...', {
-                                webWidth: 'w-1/2',
-                            })}
-                            {renderField('Reg. No', formData.registration_no || '', 'registration_no', 'Registration number', {
-                                webWidth: 'w-1/2',
-                            })}
-
-                            {/* Row 4: Department + Designation */}
-                            {renderField('Department', formData.department || '', 'department', 'Department', {
-                                webWidth: 'w-1/2',
-                            })}
-                            {renderField('Designation', formData.designation || '', 'designation', 'Designation', {
-                                webWidth: 'w-1/2',
-                            })}
-
-                            {/* Row 5: Gender + Age */}
-                            {renderField('Gender', formData.gender || 'Male', 'gender', 'Gender', {
-                                isDropdown: true,
-                                dropdownOptions: ['Male', 'Female'],
-                                webWidth: 'w-1/2',
-                            })}
-                            {renderField('Age', formData.age || '', 'age', 'Age', {
-                                keyboardType: 'numeric',
-                                maxLength: 2,
-                                webWidth: 'w-1/2',
-                            })}
+                        {/* Header — matches Swift navigation bar with Cancel and Done */}
+                        <View className="flex-row items-center justify-between px-6 py-4 border-b border-gray-100">
+                            <TouchableOpacity onPress={onClose} className="p-2">
+                                <Text className="text-[#007AFF] text-[17px]">Cancel</Text>
+                            </TouchableOpacity>
+                            <Text className="text-gray-900 text-[18px] font-bold">Edit Profile</Text>
+                            <TouchableOpacity onPress={handleSave} disabled={isSaving} className="p-2">
+                                {isSaving ? (
+                                    <ActivityIndicator size="small" color="#007AFF" />
+                                ) : (
+                                    <Text className="text-[#007AFF] text-[17px] font-semibold">Done</Text>
+                                )}
+                            </TouchableOpacity>
                         </View>
 
-                        <View className="h-10" />
-                    </ScrollView>
-                </KeyboardAvoidingView>
+                        <ScrollView
+                            showsVerticalScrollIndicator={false}
+                            className="py-6 max-h-[80vh]"
+                            keyboardShouldPersistTaps="handled"
+                        >
+                            <View className={isWeb ? "flex-row flex-wrap px-4" : ""}>
+                                {/* Row 1: Prefix + First Name + Last Name */}
+                                {renderField('Prefix', formData.prefix || '', 'prefix', 'Dr.', {
+                                    isDropdown: true,
+                                    dropdownOptions: ['Dr.', 'Mr.', 'Mrs.', 'Ms.'],
+                                    webWidth: 'w-1/6',
+                                })}
+                                {renderField('First Name', formData.first_name || '', 'first_name', 'First name', {
+                                    webWidth: 'w-5/12',
+                                })}
+                                {renderField('Last Name', formData.last_name || '', 'last_name', 'Last name', {
+                                    webWidth: 'w-5/12',
+                                })}
+
+                                {/* Row 2: Email (read-only) + Phone */}
+                                {renderField('Email', formData.email || '', 'email', 'Email', {
+                                    keyboardType: 'email-address',
+                                    readOnly: true,
+                                    webWidth: 'w-1/2',
+                                })}
+                                {renderField('Phone', formData.phone_no || '', 'phone_no', 'Phone number', {
+                                    keyboardType: 'phone-pad',
+                                    maxLength: 10,
+                                    webWidth: 'w-1/2',
+                                })}
+
+                                {/* Row 3: Qualification + Registration No */}
+                                {renderField('Qualification', formData.qualification || '', 'qualification', 'MBBS, MD...', {
+                                    webWidth: 'w-1/2',
+                                })}
+                                {renderField('Reg. No', formData.registration_no || '', 'registration_no', 'Registration number', {
+                                    webWidth: 'w-1/2',
+                                })}
+
+                                {/* Row 4: Department + Designation */}
+                                {renderField('Department', formData.department || '', 'department', 'Department', {
+                                    webWidth: 'w-1/2',
+                                })}
+                                {renderField('Designation', formData.designation || '', 'designation', 'Designation', {
+                                    webWidth: 'w-1/2',
+                                })}
+
+                                {/* Row 5: Gender + Age */}
+                                {renderField('Gender', formData.gender || 'Male', 'gender', 'Gender', {
+                                    isDropdown: true,
+                                    dropdownOptions: ['Male', 'Female'],
+                                    webWidth: 'w-1/2',
+                                })}
+                                {renderField('Age', formData.age || '', 'age', 'Age', {
+                                    keyboardType: 'numeric',
+                                    maxLength: 2,
+                                    webWidth: 'w-1/2',
+                                })}
+
+                                {/* Row 6: Signature */}
+                                {isWeb ? (
+                                    <View className="mb-4 px-2 w-full mt-2">
+                                        <View className="flex-row items-center justify-between mb-1.5 ml-1">
+                                            <Text className="text-gray-600 font-medium text-sm">Signature</Text>
+                                            <TouchableOpacity onPress={() => setFormData(prev => ({ ...prev, signature: [] }))} className="flex-row items-center bg-gray-100 px-3 py-1.5 rounded-full">
+                                                <Icon icon={CONSULTATION_ICONS.brush} size={14} color="#FF3B30" />
+                                                <Text className="text-[#FF3B30] text-xs font-medium ml-1">Clear</Text>
+                                            </TouchableOpacity>
+                                        </View>
+                                        <View className="border border-gray-200 rounded-xl h-40 bg-gray-50 overflow-hidden" style={{ zIndex: 10 }}>
+                                            {typeof formData.signature === 'string' && formData.signature.length > 0 ? (
+                                                <Image source={{ uri: formData.signature.startsWith('data:') ? formData.signature : `data:image/png;base64,${formData.signature}` }} style={{ width: '80%', height: '80%' }} resizeMode="contain" />
+                                            ) : (
+                                                <DrawingCanvas
+                                                    canvasOnly
+                                                    initialDrawings={Array.isArray(formData.signature) ? formData.signature : []}
+                                                    onStrokesChange={(strokes) => setFormData((prev: any) => ({ ...prev, signature: strokes }))}
+                                                    penColor="#000000"
+                                                    penThickness={2}
+                                                    isErasing={false}
+                                                />
+                                            )}
+                                        </View>
+                                    </View>
+                                ) : (
+                                    <View className="mb-5 px-6 w-full">
+                                        <View className="flex-row justify-between items-center mb-2">
+                                            <Text className="text-gray-800 text-[16px] font-medium w-32">Signature</Text>
+                                            <TouchableOpacity onPress={() => setFormData(prev => ({ ...prev, signature: [] }))} className="flex-row items-center bg-[#f2f4f7] px-3 py-2 rounded-lg">
+                                                <Icon icon={CONSULTATION_ICONS.brush} size={16} color="#FF3B30" />
+                                                <Text className="text-[#FF3B30] text-[14px] font-medium ml-1.5">Clear</Text>
+                                            </TouchableOpacity>
+                                        </View>
+                                        <View className="h-40 bg-[#f2f4f7] rounded-xl overflow-hidden mt-2" style={{ zIndex: 10 }}>
+                                            {typeof formData.signature === 'string' && formData.signature.length > 0 ? (
+                                                <Image source={{ uri: formData.signature.startsWith('data:') ? formData.signature : `data:image/png;base64,${formData.signature}` }} style={{ width: '100%', height: '100%' }} resizeMode="contain" />
+                                            ) : (
+                                                <DrawingCanvas
+                                                    canvasOnly
+                                                    initialDrawings={Array.isArray(formData.signature) ? formData.signature : []}
+                                                    onStrokesChange={(strokes) => setFormData((prev: any) => ({ ...prev, signature: strokes }))}
+                                                    penColor="#000000"
+                                                    penThickness={2}
+                                                    isErasing={false}
+                                                />
+                                            )}
+                                        </View>
+                                    </View>
+                                )}
+                            </View>
+
+                            <View className="h-10" />
+                        </ScrollView>
+                    </Pressable>
+                </Pressable>
 
                 {activeDropdown ? (
                     <View className="absolute inset-0 justify-center items-center px-6" style={{ zIndex: 20 }}>
@@ -316,7 +448,7 @@ export function DoctorProfileModal({ visible, onClose, user, onSave }: DoctorPro
                         </View>
                     </View>
                 ) : null}
-            </View>
+            </KeyboardAvoidingView>
         </Modal>
     );
 }

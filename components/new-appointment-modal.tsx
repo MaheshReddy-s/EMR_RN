@@ -6,6 +6,7 @@ import {
     ActivityIndicator,
     Modal,
     Platform,
+    Pressable,
     ScrollView,
     Text,
     TextInput,
@@ -141,8 +142,9 @@ export default function NewAppointmentModal({
             animationType="fade"
             onRequestClose={handleClose}
         >
-            <View className="flex-1 bg-black/50 justify-center items-center p-4">
-                <View
+            <Pressable className="flex-1 bg-black/50 justify-center items-center p-4" onPress={handleClose}>
+                <Pressable
+                    onPress={(event) => event.stopPropagation()}
                     style={{
                         backgroundColor: 'white',
                         borderRadius: 16,
@@ -164,7 +166,7 @@ export default function NewAppointmentModal({
                                 {step === 0 ? 'Start Consultation' : 'Consultation Type'}
                             </Text>
                         </View>
-                        <TouchableOpacity onPress={onClose} className="p-2">
+                        <TouchableOpacity onPress={handleClose} className="p-2">
                             <Icon icon={APPOINTMENT_ICONS.closeCircle} size={32} color="#007AFF" />
                         </TouchableOpacity>
                     </View>
@@ -271,8 +273,8 @@ export default function NewAppointmentModal({
                             </TouchableOpacity>
                         </View>
                     )}
-                </View>
-            </View>
+                </Pressable>
+            </Pressable>
         </Modal>
     );
 }

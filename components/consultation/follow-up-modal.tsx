@@ -3,6 +3,7 @@ import { Icon } from '@/components/ui/Icon';
 import React, { useMemo, useState } from 'react';
 import {
     Modal,
+    Pressable,
     ScrollView,
     Text,
     TouchableOpacity,
@@ -114,8 +115,9 @@ export default function FollowUpModal({ visible, onClose, onSkip, onContinue }: 
 
     return (
         <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-            <View className="flex-1 bg-black/50 justify-center items-center p-4">
-                <View
+            <Pressable className="flex-1 bg-black/50 justify-center items-center p-4" onPress={onClose}>
+                <Pressable
+                    onPress={(event) => event.stopPropagation()}
                     style={{
                         backgroundColor: 'white',
                         borderRadius: 16,
@@ -252,8 +254,8 @@ export default function FollowUpModal({ visible, onClose, onSkip, onContinue }: 
                             </Text>
                         </TouchableOpacity>
                     </View>
-                </View>
-            </View>
+                </Pressable>
+            </Pressable>
         </Modal>
     );
 }

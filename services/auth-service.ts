@@ -165,9 +165,26 @@ export const AuthService = {
                     const storedUser = JSON.parse(userJson) as User;
                     const user = normalizeSessionUser(storedUser);
                     api.setToken(token);
-
                     // Populate store
                     useSessionStore.getState().setSession(user, token);
+
+                    // Fetch latest profile silently from the backend to sync signature and details
+                    try {
+                        const doctorId = user.id;
+                        if (doctorId) {
+                            const latestData = await api.get<any>(API_ENDPOINTS.DOCTOR.UPDATE(doctorId));
+                            if (latestData) {
+                                const actualData = latestData.data || latestData;
+                                const syncedUser = normalizeSessionUser({ ...user, ...actualData });
+                                await Storage.setItem(USER_KEY, JSON.stringify(syncedUser));
+                                useSessionStore.getState().setSession(syncedUser, token);
+                                return syncedUser;
+                            }
+                        }
+                    } catch (e) {
+                        if (__DEV__) console.warn('Failed to sync latest doctor profile on startup:', e);
+                    }
+
                     return user;
                 }
             } catch (e) {
@@ -219,13 +236,18 @@ export const AuthService = {
         return Storage.getItem(FILE_ENCRYPTION_KEY);
     },
 
-    /**
-     * Update doctor profile details
-     */
     async updateDoctorProfile(doctorId: string, payload: any): Promise<any> {
         const result = await api.put<any>(API_ENDPOINTS.DOCTOR.UPDATE(doctorId), payload);
+
         // Refresh session data in store if user profile was updated
-        await this.restoreSession();
+        const { user: currentUser, token: currentToken } = useSessionStore.getState();
+        if (currentUser && currentToken) {
+            const updatedData = result?.data || result;
+            const updatedUser = { ...currentUser, ...updatedData, ...payload } as User;
+            await Storage.setItem(USER_KEY, JSON.stringify(updatedUser));
+            useSessionStore.getState().setSession(updatedUser, currentToken);
+        }
+
         return result;
     },
 };

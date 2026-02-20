@@ -39,6 +39,7 @@ export interface User {
     clinic_name?: string;
     address?: string;
     clinicDetails?: ClinicDetails;
+    signature?: string;
 }
 
 export interface LoginResponse extends User {

@@ -3,7 +3,8 @@ import { ActivityIndicator, RefreshControl, ScrollView, Text, TextInput, Touchab
 import { SETTINGS_ICONS } from '@/constants/icons';
 import { Icon } from '@/components/ui/Icon';
 import { DataEditModal } from '@/components/settings/DataEditModal';
-import PrescriptionModal from '@/components/consultation/prescription-modal';
+import PrescriptionEditModal from '@/components/consultation/prescription-edit-modal';
+import type { PrescriptionData } from '@/entities/consultation/types';
 import SettingsSectionHeader from '@/features/settings/components/SettingsSectionHeader';
 import type { MasterDataItem } from '@/repositories';
 import type { SettingSection } from '@/features/settings/types';
@@ -27,7 +28,7 @@ interface MasterDataSectionProps {
     searchQuery: string;
     onSearchQueryChange: (query: string) => void;
     isPrescriptionModalVisible?: boolean;
-    currentPrescriptionData?: any;
+    currentPrescriptionData?: PrescriptionData | null;
 }
 
 const MasterDataSection = ({
@@ -122,11 +123,11 @@ const MasterDataSection = ({
             onSave={onSaveItem}
         />
 
-        <PrescriptionModal
+        <PrescriptionEditModal
             visible={isPrescriptionModalVisible || false}
             onClose={onCloseModal}
-            onSave={onSaveItem}
-            initialData={currentPrescriptionData}
+            onSave={(data) => void onSaveItem(data)}
+            initialData={currentPrescriptionData || undefined}
         />
     </View>
 );

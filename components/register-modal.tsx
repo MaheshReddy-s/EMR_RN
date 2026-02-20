@@ -7,6 +7,7 @@ import {
     Alert,
     Modal,
     Platform,
+    Pressable,
     ScrollView,
     Text,
     TextInput,
@@ -142,8 +143,9 @@ export default function RegisterModal({
             animationType="fade"
             onRequestClose={handleClose}
         >
-            <View className="flex-1 bg-black/50 justify-center items-center p-4">
-                <View
+            <Pressable className="flex-1 bg-black/50 justify-center items-center p-4" onPress={handleClose}>
+                <Pressable
+                    onPress={(event) => event.stopPropagation()}
                     style={{
                         backgroundColor: 'white',
                         borderRadius: 8,
@@ -163,7 +165,7 @@ export default function RegisterModal({
                         <Text className="text-xl font-bold text-gray-800">
                             New Patient Registration
                         </Text>
-                        <TouchableOpacity onPress={onClose} className="p-2">
+                        <TouchableOpacity onPress={handleClose} className="p-2">
                             <Icon icon={REGISTER_ICONS.closeCircleOutline} size={32} color="#4A90E2" />
                         </TouchableOpacity>
                     </View>
@@ -280,8 +282,8 @@ export default function RegisterModal({
                         </View>
 
                     </ScrollView>
-                </View>
-            </View>
+                </Pressable>
+            </Pressable>
         </Modal>
     );
 }

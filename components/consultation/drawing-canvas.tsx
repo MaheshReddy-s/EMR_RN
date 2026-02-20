@@ -1,7 +1,8 @@
-import { Canvas, Group, Path, Skia, SkPath } from "@shopify/react-native-skia";
+import { Canvas, Path, Skia, SkPath, notifyChange } from "@shopify/react-native-skia";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Platform, StyleSheet, View } from 'react-native';
+import { StyleSheet, View, Platform } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { runOnJS, useSharedValue } from 'react-native-reanimated';
 import PrescriptionRowLayout, {
     API_REFERENCE_WIDTH,
     NON_PRESCRIPTION_DEFAULT_ROW_HEIGHT,
@@ -11,15 +12,25 @@ import PrescriptionRowLayout, {
 } from './prescription-row-layout';
 import type { StrokeData as ConsultationStrokeData } from '@/entities/consultation/types';
 
-// Logical width for device-independent coordinate system (matches backend PencilKit reference)
+// Performance architecture remains the same — live on UI thread, commit only on end.
+
 const LOGICAL_WIDTH = API_REFERENCE_WIDTH;
-
 const DEFAULT_PEN_COLOR = '#5d271aff';
-const DEFAULT_PEN_WIDTH = 1.5; // Default thickness for backend drawings
-const ERASER_WIDTH = 20; // Thicker stroke for eraser
-const STYLUS_POINTER_TYPE = 1; // react-native-gesture-handler PointerType.STYLUS
+const DEFAULT_PEN_WIDTH = 1.5;
+const ERASER_COLOR = '#FFFFFF';
+const ERASER_WIDTH = 20;
+const STYLUS_POINTER_TYPE = 1; // RNGH native mapping: TOUCH=0, STYLUS=1, MOUSE=2
 
-// Re-export StrokeData from centralized entity types for backward compatibility
+type BlendMode = 'clear' | 'srcOver';
+
+interface RenderStroke {
+    id: string;
+    path: SkPath;
+    color: string;
+    width: number; // display-space width
+    blendMode: BlendMode;
+}
+
 export type StrokeData = ConsultationStrokeData;
 
 interface DrawingCanvasProps {
@@ -42,8 +53,17 @@ interface DrawingCanvasProps {
     style?: any;
 }
 
-// Memoize the layout component to prevent re-renders when drawing
 const StandardRowLayout = React.memo(PrescriptionRowLayout);
+
+function scaledPathCopy(path: SkPath, scale: number): SkPath {
+    const copy = path.copy();
+    if (Math.abs(scale - 1) > 1e-6) {
+        const matrix = Skia.Matrix();
+        matrix.scale(scale, scale);
+        copy.transform(matrix);
+    }
+    return copy;
+}
 
 function DrawingCanvasComponent({
     index,
@@ -64,125 +84,33 @@ function DrawingCanvasComponent({
     onDrawingActive,
     style,
 }: DrawingCanvasProps) {
-    const [paths, setPaths] = useState<SkPath[]>([]);
-    const [pathColors, setPathColors] = useState<string[]>([]);
-    const [pathWidths, setPathWidths] = useState<number[]>([]);
-    const [renderTick, setRenderTick] = useState(0);
-
-    const pathRef = useRef<SkPath | null>(null);
-    const currentPathRef = useRef<SkPath | null>(null);
-    const isDrawing = useRef(false);
-    const drawingActiveRef = useRef(false);
-    const localCanvasRef = useRef<View>(null);
-    const hasUserDrawn = useRef(false);
-    const [canvasWidth, setCanvasWidth] = useState<number>(0);
-    const frameUpdatePendingRef = useRef(false);
-    const frameRequestRef = useRef<number | null>(null);
+    const [strokes, setStrokes] = useState<RenderStroke[]>([]);
+    const [canvasWidth, setCanvasWidth] = useState(0);
 
     const onStrokesChangeRef = useRef(onStrokesChange);
     onStrokesChangeRef.current = onStrokesChange;
 
-    const initialLoadDone = useRef(false);
-
-    // Scale factors: 
-    // We store everything in logical coords (0-820) and scale for display 
-    const effectiveLogicalWidth = prescription?.referenceWidth || LOGICAL_WIDTH;
-    const displayScale = canvasWidth > 0 ? canvasWidth / effectiveLogicalWidth : 1;
-
-    // Load initial drawings from API
-    useEffect(() => {
-        if (!initialDrawings || initialDrawings.length === 0) return;
-        if (canvasWidth <= 0) return;
-        if (initialLoadDone.current) return;
-
-        const loadedPaths: SkPath[] = [];
-        const loadedColors: string[] = [];
-        const loadedWidths: number[] = [];
-
-        for (const stroke of initialDrawings) {
-            const svgString = typeof stroke === 'string' ? stroke : stroke.svg;
-            if (!svgString) continue;
-
-            try {
-                // Load path in logical coords directly (no regex scaling needed)
-                const path = Skia.Path.MakeFromSVGString(svgString);
-                if (path) {
-                    loadedPaths.push(path);
-                    loadedColors.push((stroke as any).color || DEFAULT_PEN_COLOR);
-                    // Use logical width from API or default
-                    loadedWidths.push((stroke as any).width || DEFAULT_PEN_WIDTH);
-                }
-            } catch (e) {
-                if (__DEV__) console.warn('Failed to parse SVG path:', svgString, e);
-            }
-        }
-
-        if (loadedPaths.length > 0) {
-            initialLoadDone.current = true;
-            hasUserDrawn.current = false;
-            setPaths(loadedPaths);
-            setPathColors(loadedColors);
-            setPathWidths(loadedWidths);
-        }
-    }, [initialDrawings, canvasWidth, prescription?.id, prescription?.referenceWidth]);
-
-    // Handle prescription change (reset state)
-    useEffect(() => {
-        if (frameRequestRef.current !== null) {
-            cancelAnimationFrame(frameRequestRef.current);
-            frameRequestRef.current = null;
-        }
-        frameUpdatePendingRef.current = false;
-        initialLoadDone.current = false;
-        hasUserDrawn.current = false;
-        setPaths([]);
-        setPathColors([]);
-        setPathWidths([]);
-        pathRef.current = null;
-        currentPathRef.current = null;
-        setRenderTick((prev) => prev + 1);
-    }, [prescription?.id]);
-
-    useEffect(() => () => {
-        if (frameRequestRef.current !== null) {
-            cancelAnimationFrame(frameRequestRef.current);
-            frameRequestRef.current = null;
-        }
-    }, []);
-
-    // Save paths - convert screen coords back to 720px logical coords
-    useEffect(() => {
-        if (!hasUserDrawn.current) return;
-
-        if (onStrokesChangeRef.current && displayScale > 0) {
-            const strokeDataArray: StrokeData[] = paths.map((p, i) => {
-                const svgString = p.toSVGString();
-                if (!svgString) return null;
-
-                return {
-                    svg: svgString, // Already logical coords
-                    color: pathColors[i] || DEFAULT_PEN_COLOR,
-                    width: (pathWidths[i] || DEFAULT_PEN_WIDTH),
-                    blendMode: pathColors[i] === '#FFFFFF' ? 'clear' : 'srcOver',
-                } as StrokeData;
-            }).filter(Boolean) as StrokeData[];
-
-            onStrokesChangeRef.current(strokeDataArray);
-        }
-    }, [paths, pathColors, pathWidths, displayScale]);
-
+    const localCanvasRef = useRef<View>(null);
     const effectiveCanvasRef = canvasRef || localCanvasRef;
 
-    const isStylusInput = useCallback((e: any) => {
-        if (Platform.OS === 'web') return true;
-        // Some callbacks expose pointerType, others only stylusData.
-        return e?.pointerType === STYLUS_POINTER_TYPE || !!e?.stylusData;
-    }, []);
+    const hasUserDrawnRef = useRef(false);
+    const initialLoadDoneRef = useRef(false);
+    const drawingActiveRef = useRef(false);
+    const previousScaleRef = useRef(1);
+    const clearLiveAfterCommitRef = useRef(false);
+    const strokeIdRef = useRef(0);
+    const previousInitialCountRef = useRef(initialDrawings?.length ?? 0);
 
-    const isStylusTouch = useCallback((e: any) => {
-        if (Platform.OS === 'web') return true;
-        return e?.pointerType === STYLUS_POINTER_TYPE;
-    }, []);
+    const effectiveLogicalWidth = prescription?.referenceWidth || LOGICAL_WIDTH;
+    const displayScale = canvasWidth > 0 ? canvasWidth / effectiveLogicalWidth : 1;
+    const shouldNotifyDrawingActive = !!onDrawingActive;
+
+    // Shared values — live stroke runs fully on UI thread
+    const isDrawing = useSharedValue(false);
+    const livePath = useSharedValue<SkPath>(Skia.Path.Make()); // starts empty
+    const liveColor = useSharedValue<string>(penColor);
+    const liveWidth = useSharedValue<number>(penThickness);
+    const liveBlendMode = useSharedValue<BlendMode>('srcOver');
 
     const setDrawingActive = useCallback((active: boolean) => {
         if (drawingActiveRef.current === active) return;
@@ -190,152 +118,105 @@ function DrawingCanvasComponent({
         onDrawingActive?.(active);
     }, [onDrawingActive]);
 
-    useEffect(() => () => {
-        setDrawingActive(false);
-    }, [setDrawingActive]);
+    const resetLiveStroke = useCallback(() => {
+        // Only used on unmount / clear — not on every commit
+        livePath.value = Skia.Path.Make();
+        notifyChange(livePath);
+        isDrawing.value = false;
+    }, [isDrawing, livePath]);
 
-    const scheduleCurrentPathRender = useCallback(() => {
-        if (frameUpdatePendingRef.current) return;
-
-        frameUpdatePendingRef.current = true;
-        frameRequestRef.current = requestAnimationFrame(() => {
-            frameUpdatePendingRef.current = false;
-            frameRequestRef.current = null;
-            setRenderTick((prev) => prev + 1);
-        });
+    const commitStrokeDirect = useCallback((path: SkPath, color: string, width: number, blendMode: BlendMode) => {
+        hasUserDrawnRef.current = true;
+        clearLiveAfterCommitRef.current = true;
+        setStrokes((prev) => [...prev, {
+            id: `stroke-${strokeIdRef.current++}`,
+            path,
+            color,
+            width,
+            blendMode,
+        }]);
     }, []);
 
-    const beginStrokeAt = useCallback((x: number, y: number) => {
-        if (pathRef.current) return;
-
-        const newPath = Skia.Path.Make();
-        if (!newPath) return;
-
-        newPath.moveTo(x, y);
-        // Tiny starter segment so first touch is visible immediately.
-        newPath.lineTo(x + 0.01, y + 0.01);
-        pathRef.current = newPath;
-        currentPathRef.current = newPath;
-        setRenderTick((prev) => prev + 1);
-    }, []);
-
+    // Stylus-only input:
+    // - pointerType === 1 is stylus in RNGH on native.
+    // - stylusData exists for stylus events on iOS/Android.
+    // Finger touches are ignored so hand input never draws.
     const drawingGesture = useMemo(() => Gesture.Pan()
         .minDistance(0)
-        .runOnJS(true)
-        .onTouchesDown((event) => {
-            if (!isStylusTouch(event)) {
-                isDrawing.current = false;
-                return;
-            }
-
-            const touch = event.changedTouches?.[0] || event.allTouches?.[0];
-            if (!touch) return;
-
-            isDrawing.current = true;
-            beginStrokeAt(touch.x / displayScale, touch.y / displayScale);
-        })
-        .onTouchesMove((event) => {
-            if (!isDrawing.current || !pathRef.current || !isStylusTouch(event)) return;
-
-            const touch = event.changedTouches?.[0] || event.allTouches?.[0];
-            if (!touch) return;
-
-            pathRef.current.lineTo(touch.x / displayScale, touch.y / displayScale);
-            scheduleCurrentPathRender();
-        })
+        .shouldCancelWhenOutside(false)
         .onBegin((e) => {
-            if (!isStylusInput(e)) {
-                isDrawing.current = false;
-                return;
-            }
+            const isStylus = e.pointerType === STYLUS_POINTER_TYPE || !!(e as any).stylusData;
+            if (!isStylus) return;
 
-            isDrawing.current = true;
-            const logicalX = e.x / displayScale;
-            const logicalY = e.y / displayScale;
-            beginStrokeAt(logicalX, logicalY);
+            if (shouldNotifyDrawingActive) {
+                runOnJS(setDrawingActive)(true);
+            }
         })
         .onStart((e) => {
-            if (!isStylusInput(e)) {
-                isDrawing.current = false;
+            const isStylus = e.pointerType === STYLUS_POINTER_TYPE || !!(e as any).stylusData;
+            if (!isStylus) return;
+
+            const scale = displayScale > 0 ? displayScale : 1;
+
+            // Create NEW path — this replaces / discards the previous livePath atomically
+            const newPath = Skia.Path.Make();
+            newPath.moveTo(e.x, e.y);
+            // Tiny lineTo to avoid zero-length path issues on some devices
+            newPath.lineTo(e.x + 0.0001, e.y + 0.0001);
+
+            livePath.value = newPath;
+            liveColor.value = isErasing ? ERASER_COLOR : penColor;
+            liveBlendMode.value = isErasing ? 'clear' : 'srcOver';
+            liveWidth.value = (isErasing ? ERASER_WIDTH : penThickness) * scale;
+            isDrawing.value = true;
+            notifyChange(livePath);
+        })
+        .onUpdate((e) => {
+            if (!isDrawing.value) return;
+            livePath.value.lineTo(e.x, e.y);
+            notifyChange(livePath);
+        })
+        .onEnd(() => {
+            if (!isDrawing.value) {
+                if (shouldNotifyDrawingActive) {
+                    runOnJS(setDrawingActive)(false);
+                }
                 return;
             }
 
-            isDrawing.current = true;
-            setDrawingActive(true);
-            const logicalX = e.x / displayScale;
-            const logicalY = e.y / displayScale;
-            beginStrokeAt(logicalX, logicalY);
-        })
-        .onUpdate((e) => {
-            if (!isDrawing.current || !pathRef.current) return;
+            // Copy before potential next gesture overwrites it
+            const pathCopy = livePath.value.copy();
+            runOnJS(commitStrokeDirect)(pathCopy, liveColor.value, liveWidth.value, liveBlendMode.value);
 
-            // Convert screen coordinates to logical coordinates
-            const logicalX = e.x / displayScale;
-            const logicalY = e.y / displayScale;
-            pathRef.current.lineTo(logicalX, logicalY);
-
-            // Re-render at most once per frame while drawing.
-            scheduleCurrentPathRender();
-        })
-        .onEnd(() => {
-            if (!isDrawing.current || !pathRef.current) return;
-
-            if (frameRequestRef.current !== null) {
-                cancelAnimationFrame(frameRequestRef.current);
-                frameRequestRef.current = null;
+            isDrawing.value = false;
+            if (shouldNotifyDrawingActive) {
+                runOnJS(setDrawingActive)(false);
             }
-            frameUpdatePendingRef.current = false;
-
-            const svgString = pathRef.current.toSVGString();
-            const committedPath = pathRef.current.copy();
-            if (svgString) {
-                hasUserDrawn.current = true;
-                setPaths(prev => [...prev, committedPath]);
-                setPathColors(prev => [...prev, isErasing ? '#FFFFFF' : penColor]);
-                setPathWidths(prev => [...prev, isErasing ? ERASER_WIDTH : penThickness]);
-            }
-
-            isDrawing.current = false;
-            pathRef.current = null;
-            currentPathRef.current = null;
-            setRenderTick((prev) => prev + 1);
-            setDrawingActive(false);
         })
         .onFinalize(() => {
-            if (frameRequestRef.current !== null) {
-                cancelAnimationFrame(frameRequestRef.current);
-                frameRequestRef.current = null;
+            if (isDrawing.value) {
+                const pathCopy = livePath.value.copy();
+                runOnJS(commitStrokeDirect)(pathCopy, liveColor.value, liveWidth.value, liveBlendMode.value);
             }
-            frameUpdatePendingRef.current = false;
-
-            if (isDrawing.current) {
-                isDrawing.current = false;
+            isDrawing.value = false;
+            if (shouldNotifyDrawingActive) {
+                runOnJS(setDrawingActive)(false);
             }
-            currentPathRef.current = null;
-            setRenderTick((prev) => prev + 1);
-            setDrawingActive(false);
         }),
-        [isErasing, penColor, penThickness, isStylusInput, isStylusTouch, displayScale, scheduleCurrentPathRender, beginStrokeAt, setDrawingActive]);
-
-    const handleClear = useCallback(() => {
-        if (frameRequestRef.current !== null) {
-            cancelAnimationFrame(frameRequestRef.current);
-            frameRequestRef.current = null;
-        }
-        frameUpdatePendingRef.current = false;
-        pathRef.current = null;
-        currentPathRef.current = null;
-
-        setPaths([]);
-        setPathColors([]);
-        setPathWidths([]);
-        setRenderTick((prev) => prev + 1);
-        setDrawingActive(false);
-        hasUserDrawn.current = true;
-        if (onClear) {
-            onClear();
-        }
-    }, [onClear, setDrawingActive]);
+        [
+            commitStrokeDirect,
+            displayScale,
+            isDrawing,
+            isErasing,
+            liveBlendMode,
+            liveColor,
+            livePath,
+            liveWidth,
+            penColor,
+            penThickness,
+            shouldNotifyDrawingActive,
+            setDrawingActive,
+        ]);
 
     const handleCanvasLayout = useCallback((event: any) => {
         const { width } = event.nativeEvent.layout;
@@ -343,6 +224,135 @@ function DrawingCanvasComponent({
             setCanvasWidth(width);
         }
     }, [canvasWidth]);
+
+    const handleClear = useCallback(() => {
+        hasUserDrawnRef.current = true;
+        setStrokes([]);
+        resetLiveStroke(); // now safe — clears live for next draw
+        setDrawingActive(false);
+        onClear?.();
+    }, [onClear, resetLiveStroke, setDrawingActive]);
+
+    useEffect(() => {
+        return () => {
+            resetLiveStroke();
+            setDrawingActive(false);
+        };
+    }, [resetLiveStroke, setDrawingActive]);
+
+    useEffect(() => {
+        if (!clearLiveAfterCommitRef.current) return;
+        clearLiveAfterCommitRef.current = false;
+        // Hide live stroke after commit without rebuilding path object (reduces end-of-stroke flicker).
+        liveWidth.value = 0;
+    }, [liveWidth, strokes]);
+
+    useEffect(() => {
+        // Sync explicit external clears (parent array transitions non-empty -> empty) without remounting.
+        const currentInitialCount = initialDrawings?.length ?? 0;
+        const previousInitialCount = previousInitialCountRef.current;
+        if (previousInitialCount > 0 && currentInitialCount === 0 && strokes.length > 0) {
+            setStrokes([]);
+            hasUserDrawnRef.current = false;
+            resetLiveStroke();
+        }
+        previousInitialCountRef.current = currentInitialCount;
+    }, [initialDrawings, strokes.length, resetLiveStroke]);
+
+    useEffect(() => {
+        initialLoadDoneRef.current = false;
+        hasUserDrawnRef.current = false;
+        clearLiveAfterCommitRef.current = false;
+        strokeIdRef.current = 0;
+        previousInitialCountRef.current = initialDrawings?.length ?? 0;
+        previousScaleRef.current = displayScale > 0 ? displayScale : 1;
+        setStrokes([]);
+        resetLiveStroke();
+        setDrawingActive(false);
+    }, [prescription?.id, resetLiveStroke, setDrawingActive]);
+
+    // Load initial API strokes (unchanged)
+    useEffect(() => {
+        if (!initialDrawings || initialDrawings.length === 0) return;
+        if (canvasWidth <= 0) return;
+        if (initialLoadDoneRef.current) return;
+
+        const loaded: RenderStroke[] = [];
+
+        for (const stroke of initialDrawings) {
+            const svg = typeof stroke === 'string' ? stroke : stroke.svg;
+            if (!svg) continue;
+
+            try {
+                if (!svg || svg === '') continue;
+                const logicalPath = Skia.Path.MakeFromSVGString(svg);
+                if (!logicalPath) continue;
+
+                const color = (stroke as any)?.color || DEFAULT_PEN_COLOR;
+                const logicalWidth = typeof (stroke as any)?.width === 'number'
+                    ? (stroke as any).width
+                    : DEFAULT_PEN_WIDTH;
+                const blendMode: BlendMode = (stroke as any)?.blendMode === 'clear' || color === ERASER_COLOR
+                    ? 'clear'
+                    : 'srcOver';
+
+                loaded.push({
+                    id: `loaded-${strokeIdRef.current++}`,
+                    path: scaledPathCopy(logicalPath, displayScale),
+                    color,
+                    width: logicalWidth * displayScale,
+                    blendMode,
+                });
+            } catch (error) {
+                if (__DEV__) console.warn('Failed to parse SVG path:', svg, error);
+            }
+        }
+
+        initialLoadDoneRef.current = true;
+        hasUserDrawnRef.current = false;
+        previousScaleRef.current = displayScale;
+        setStrokes(loaded);
+    }, [initialDrawings, canvasWidth, displayScale]);
+
+    // Rescale on layout change (unchanged)
+    useEffect(() => {
+        if (displayScale <= 0) return;
+        const prev = previousScaleRef.current;
+        if (Math.abs(prev - displayScale) < 0.0001) return;
+
+        const ratio = displayScale / prev;
+        previousScaleRef.current = displayScale;
+        if (!Number.isFinite(ratio) || ratio === 1) return;
+
+        setStrokes((prevStrokes) => prevStrokes.map((stroke) => ({
+            ...stroke,
+            path: scaledPathCopy(stroke.path, ratio),
+            width: stroke.width * ratio,
+        })));
+    }, [displayScale]);
+
+    // Save logical strokes back (consider debouncing if needed)
+    useEffect(() => {
+        if (!hasUserDrawnRef.current || !onStrokesChangeRef.current || displayScale <= 0) return;
+
+        const inverse = 1 / displayScale;
+        const data: StrokeData[] = strokes.map((stroke) => {
+            const logicalPath = inverse === 1
+                ? stroke.path
+                : scaledPathCopy(stroke.path, inverse);
+            const svg = logicalPath.toSVGString();
+            if (!svg) return null;
+
+            return {
+                svg,
+                color: stroke.color,
+                width: stroke.width * inverse,
+                blendMode: stroke.blendMode,
+            } as StrokeData;
+        }).filter(Boolean) as StrokeData[];
+
+        onStrokesChangeRef.current(data);
+    }, [strokes, displayScale]);
 
     const renderCanvas = useCallback(() => (
         <GestureDetector gesture={drawingGesture}>
@@ -353,36 +363,43 @@ function DrawingCanvasComponent({
                 ref={effectiveCanvasRef}
             >
                 <Canvas style={styles.canvas}>
-                    <Group transform={[{ scale: displayScale }]}>
-                        {paths.map((p, i) => (
-                            <Path
-                                key={`${prescription?.id}-path-${i}`}
-                                path={p}
-                                style="stroke"
-                                color={pathColors[i]}
-                                strokeWidth={pathWidths[i]}
-                                blendMode={pathColors[i] === '#FFFFFF' ? 'clear' : 'srcOver'}
-                                strokeCap="round"
-                                strokeJoin="round"
-                            />
-                        ))}
-                        {currentPathRef.current && (
-                            <Path
-                                key={`live-path-${renderTick}`}
-                                path={currentPathRef.current}
-                                style="stroke"
-                                color={isErasing ? '#FFFFFF' : penColor}
-                                strokeWidth={isErasing ? ERASER_WIDTH : penThickness}
-                                blendMode={isErasing ? 'clear' : 'srcOver'}
-                                strokeCap="round"
-                                strokeJoin="round"
-                            />
-                        )}
-                    </Group>
+                    {strokes.map((stroke) => (
+                        <Path
+                            key={stroke.id}
+                            path={stroke.path}
+                            style="stroke"
+                            color={stroke.color}
+                            strokeWidth={stroke.width}
+                            blendMode={stroke.blendMode}
+                            strokeCap="round"
+                            strokeJoin="round"
+                        />
+                    ))}
+                    <Path
+                        key="live-stroke"
+                        path={livePath}
+                        style="stroke"
+                        color={liveColor}
+                        strokeWidth={liveWidth}
+                        blendMode={liveBlendMode}
+                        strokeCap="round"
+                        strokeJoin="round"
+                    />
                 </Canvas>
             </View>
         </GestureDetector>
-    ), [paths, pathColors, pathWidths, renderTick, isErasing, penColor, penThickness, displayScale, drawingGesture, handleCanvasLayout, effectiveCanvasRef, style, prescription?.id]);
+    ), [
+        drawingGesture,
+        effectiveCanvasRef,
+        handleCanvasLayout,
+        isErasing,
+        liveBlendMode,
+        liveColor,
+        livePath,
+        liveWidth,
+        strokes,
+        style,
+    ]);
 
     if (canvasOnly) {
         return renderCanvas();
@@ -391,8 +408,6 @@ function DrawingCanvasComponent({
     const hasDosage = !!(prescription?.dosage && prescription?.dosage !== 'N/A' && !prescription?.dosage.includes('-'));
     const hasInstructions = !!prescription?.instructions;
     const hasRow2 = !isFullWidth && (hasDosage || hasInstructions);
-    // Standardize heights to be tight and balanced
-    // 26px for single line, 46px for double line.
     const calculatedDefaultHeight = isFullWidth
         ? (prescription?.notes ? NON_PRESCRIPTION_NOTES_DEFAULT_ROW_HEIGHT : NON_PRESCRIPTION_DEFAULT_ROW_HEIGHT)
         : (hasRow2 ? PRESCRIPTION_WITH_ROW_2_DEFAULT_ROW_HEIGHT : PRESCRIPTION_DEFAULT_ROW_HEIGHT);
@@ -407,7 +422,7 @@ function DrawingCanvasComponent({
             onDelete={onDelete || (() => { })}
             onClear={handleClear}
             onEdit={onEdit}
-            canClear={paths.length > 0}
+            canClear={strokes.length > 0}
             showIndex={showIndex}
             isFullWidth={isFullWidth}
         />

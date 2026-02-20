@@ -10,6 +10,7 @@ import { APP_ERROR_CODES, AppError } from '@/shared';
 import { useSessionStore } from '@/stores/session-store';
 import { api } from '@/lib/api-client';
 import { API_ENDPOINTS } from '@/constants/endpoints';
+import type { PrescriptionData, PrescriptionVariant } from '@/entities/consultation/types';
 import {
     CONSULTATION_SETTINGS_DATA,
     INITIAL_SECTIONS_ORDER,
@@ -31,6 +32,127 @@ const SECTION_LABEL_MAP: Record<string, string> = {
 };
 
 const ALL_SECTION_KEYS = Object.keys(SECTION_LABEL_MAP);
+const TIMING_LETTERS = ['M', 'A', 'E', 'N'] as const;
+const MIN_PENCIL_THICKNESS = 1;
+const MAX_PENCIL_THICKNESS = 50;
+
+function normalizePencilThickness(value: unknown): number {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) return MIN_PENCIL_THICKNESS;
+    return Math.max(MIN_PENCIL_THICKNESS, Math.min(MAX_PENCIL_THICKNESS, Math.round(parsed)));
+}
+
+function normalizeTimings(rawValue: unknown): string {
+    const raw = typeof rawValue === 'number'
+        ? String(rawValue)
+        : (typeof rawValue === 'string' ? rawValue : '');
+
+    const source = raw.trim().toUpperCase();
+    if (!source) return 'M-A-E-N';
+
+    const parts = source.split('-');
+    if (parts.length === 4) {
+        return parts.map((part, index) => {
+            const value = part.trim();
+            const slot = TIMING_LETTERS[index];
+            if (value === slot || value === '1') return slot;
+            if (value === '0' || value === 'O' || value === '' || value === '-') return '-';
+            return TIMING_LETTERS.includes(value as any) ? value : '-';
+        }).join('-');
+    }
+
+    if (/^[01]{4}$/.test(source)) {
+        return source
+            .split('')
+            .map((value, index) => (value === '1' ? TIMING_LETTERS[index] : '-'))
+            .join('-');
+    }
+
+    return TIMING_LETTERS
+        .map((slot) => (source.includes(slot) ? slot : '-'))
+        .join('-');
+}
+
+function mapVariantToModal(rawVariant: Record<string, any>, index: number): PrescriptionVariant {
+    const quantity = rawVariant.quantity !== undefined && rawVariant.quantity !== null
+        ? String(rawVariant.quantity).trim()
+        : '';
+    const units = typeof rawVariant.units === 'string' ? rawVariant.units.trim() : '';
+
+    let dosage = typeof rawVariant.dosage === 'string' ? rawVariant.dosage : '';
+    if (!dosage && quantity) {
+        dosage = `${quantity}${units && units !== 'N/A' ? ` ${units}` : ''}`.trim();
+    }
+    if (!dosage) dosage = 'N/A';
+
+    const rawDuration = rawVariant.duration !== undefined && rawVariant.duration !== null
+        ? String(rawVariant.duration).trim()
+        : '';
+    const duration = rawDuration && /^\d+$/.test(rawDuration)
+        ? `${rawDuration} Days`
+        : (rawDuration || '15 Days');
+
+    return {
+        id: String(rawVariant.variant_id || rawVariant._id || rawVariant.id || `${Date.now()}-${index}`),
+        timings: normalizeTimings(rawVariant.timings || rawVariant.frequency || rawVariant.time),
+        dosage,
+        duration,
+        type: String(rawVariant.medicine_type || rawVariant.type || 'Tablet'),
+        instructions: typeof rawVariant.instructions === 'string' ? rawVariant.instructions : '',
+        purchaseCount: typeof rawVariant.purchaseCount === 'string'
+            ? rawVariant.purchaseCount
+            : (typeof rawVariant.purchase_count === 'string' ? rawVariant.purchase_count : undefined),
+    };
+}
+
+function mapItemToPrescriptionData(item: MasterDataItem): PrescriptionData {
+    const rawData = item.fullData || {};
+    const rawVariants = Array.isArray(rawData.variants) ? rawData.variants : [];
+
+    return {
+        brandName: typeof rawData.brand_name === 'string' && rawData.brand_name.trim()
+            ? rawData.brand_name
+            : item.name,
+        genericName: typeof rawData.generic_name === 'string' ? rawData.generic_name : '',
+        variants: rawVariants.length > 0
+            ? rawVariants
+                .filter((variant): variant is Record<string, any> => typeof variant === 'object' && variant !== null)
+                .map((variant, index) => mapVariantToModal(variant, index))
+            : [{
+                id: Date.now().toString(),
+                timings: 'M-A-E-N',
+                dosage: 'N/A',
+                duration: '15 Days',
+                type: 'Tablet',
+            }],
+    };
+}
+
+function isPrescriptionData(value: unknown): value is PrescriptionData {
+    if (typeof value !== 'object' || value === null) return false;
+    return typeof (value as PrescriptionData).brandName === 'string' &&
+        Array.isArray((value as PrescriptionData).variants);
+}
+
+function toPrescriptionPayload(value: PrescriptionData): Record<string, any> {
+    return {
+        medicine_name: value.brandName,
+        brand_name: value.brandName,
+        generic_name: value.genericName,
+        variants: value.variants.map((variant) => ({
+            ...variant,
+            variant_id: variant.id,
+            timings: variant.timings,
+            dosage: variant.dosage,
+            duration: variant.duration,
+            type: variant.type,
+            medicine_type: variant.type,
+            instructions: variant.instructions,
+            purchaseCount: variant.purchaseCount,
+            purchase_count: variant.purchaseCount,
+        })),
+    };
+}
 
 export function useSettings() {
     const router = useRouter();
@@ -47,7 +169,7 @@ export function useSettings() {
 
     const [isModalVisible, setIsModalVisible] = useState(false);
     const [isPrescriptionModalVisible, setIsPrescriptionModalVisible] = useState(false);
-    const [currentPrescriptionData, setCurrentPrescriptionData] = useState<any>(null);
+    const [currentPrescriptionData, setCurrentPrescriptionData] = useState<PrescriptionData | null>(null);
     const [editingItem, setEditingItem] = useState<MasterDataItem | null>(null);
 
     const [isProfileModalVisible, setIsProfileModalVisible] = useState(false);
@@ -56,7 +178,7 @@ export function useSettings() {
     const [sectionsOrder, setSectionsOrder] = useState<ListItem[]>(INITIAL_SECTIONS_ORDER);
     const settingsLoadedRef = useRef(false);
     const [advancedSettings, setAdvancedSettings] = useState<AdvancedSettings>({
-        pencil_thickness: 1,
+        pencil_thickness: MIN_PENCIL_THICKNESS,
         top_space: 110,
         bottom_space: 30,
         left_space: 70,
@@ -92,7 +214,7 @@ export function useSettings() {
         setIsLoading(true);
         try {
             if (doctorId) {
-                const data = await MasterDataRepository.getItems(category);
+                const data = await MasterDataRepository.getItems(category, forceRefresh);
                 setItems(data);
                 setItemsCache((prev) => ({ ...prev, [category]: data }));
             }
@@ -151,7 +273,7 @@ export function useSettings() {
             setSectionsOrder(ordered);
 
             const fetchedAdvanced: AdvancedSettings = {
-                pencil_thickness: settings.pencil_thickness ?? 1,
+                pencil_thickness: normalizePencilThickness(settings.pencil_thickness),
                 top_space: settings.top_space ?? 110,
                 bottom_space: settings.bottom_space ?? 30,
                 left_space: settings.left_space ?? 70,
@@ -242,7 +364,12 @@ export function useSettings() {
     }, [saveSectionSettings]);
 
     const handleAdvancedSettingChange = useCallback((key: keyof AdvancedSettings, value: any) => {
-        setAdvancedSettings(prev => ({ ...prev, [key]: value }));
+        setAdvancedSettings(prev => {
+            if (key === 'pencil_thickness') {
+                return { ...prev, pencil_thickness: normalizePencilThickness(value) };
+            }
+            return { ...prev, [key]: value };
+        });
     }, []);
 
     const isAdvancedSettingsDirty = useMemo(() => {
@@ -306,21 +433,28 @@ export function useSettings() {
 
     const openAddModal = useCallback(() => {
         setEditingItem(null);
+        if (activeSection === 'Prescriptions') {
+            setCurrentPrescriptionData(null);
+            setIsModalVisible(false);
+            setIsPrescriptionModalVisible(true);
+            return;
+        }
+
+        setCurrentPrescriptionData(null);
+        setIsPrescriptionModalVisible(false);
         setIsModalVisible(true);
-    }, []);
+    }, [activeSection]);
 
     const openEditModal = useCallback((item: MasterDataItem) => {
         if (activeSection === 'Prescriptions') {
-            const rawData = (item as any).fullData || {};
-            setCurrentPrescriptionData({
-                brandName: rawData.brand_name || item.name,
-                genericName: rawData.generic_name || '',
-                variants: rawData.variants || [],
-            });
             setEditingItem(item);
+            setCurrentPrescriptionData(mapItemToPrescriptionData(item));
+            setIsModalVisible(false);
             setIsPrescriptionModalVisible(true);
         } else {
             setEditingItem(item);
+            setCurrentPrescriptionData(null);
+            setIsPrescriptionModalVisible(false);
             setIsModalVisible(true);
         }
     }, [activeSection]);
@@ -328,6 +462,8 @@ export function useSettings() {
     const closeItemModal = useCallback(() => {
         setIsModalVisible(false);
         setIsPrescriptionModalVisible(false);
+        setCurrentPrescriptionData(null);
+        setEditingItem(null);
     }, []);
 
     const handleSaveItem = useCallback(async (value: string | any) => {
@@ -337,22 +473,17 @@ export function useSettings() {
         if (!doctorId) return;
 
         try {
-            if (activeSection === 'Prescriptions' && typeof value === 'object') {
-                // Handle rich prescription data from PrescriptionModal
+            if (activeSection === 'Prescriptions') {
+                if (!isPrescriptionData(value)) {
+                    Alert.alert('Error', 'Invalid prescription data');
+                    return;
+                }
+
+                const payload = toPrescriptionPayload(value);
                 if (editingItem) {
-                    await MasterDataRepository.updateItem(category, editingItem._id, {
-                        medicine_name: value.brandName,
-                        brand_name: value.brandName,
-                        generic_name: value.genericName,
-                        variants: value.variants
-                    } as any);
+                    await MasterDataRepository.updateItem(category, editingItem._id, payload);
                 } else {
-                    await MasterDataRepository.addItem(category, {
-                        medicine_name: value.brandName,
-                        brand_name: value.brandName,
-                        generic_name: value.genericName,
-                        variants: value.variants
-                    } as any);
+                    await MasterDataRepository.addItem(category, payload);
                 }
             } else {
                 // Handle simple string value
@@ -365,6 +496,8 @@ export function useSettings() {
             await loadData(true);
             setIsModalVisible(false);
             setIsPrescriptionModalVisible(false);
+            setCurrentPrescriptionData(null);
+            setEditingItem(null);
         } catch (error) {
             if (__DEV__) console.error('Failed to save item:', error);
             Alert.alert('Error', 'Failed to save item');
